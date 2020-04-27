@@ -15,12 +15,11 @@
  */
 
 const { Playwright } = require('playwright-core/lib/server/playwright.js');
-const { executablePath } = require('playwright-core/download-browser.js');
+const packageJSON = require('./package.json');
 
 const playwright = new Playwright({
   browsers: ['webkit'],
+  packageJSON
 });
-
-playwright.webkit._executablePath = executablePath(__dirname, 'webkit');
 
 module.exports = playwright;

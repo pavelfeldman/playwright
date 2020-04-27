@@ -14,45 +14,37 @@
  * limitations under the License.
  */
 
-const path = require('path');
-const browserFetcher = require('./lib/server/browserFetcher.js');
+const browserPaths = require('./lib/registry/browserPaths.js');
+const { getFromENV, logPolitely } = require('./lib/helper.js');
 const packageJSON = require('./package.json');
 
-function resolveBrowser(packagePath, browserName) {
-  const browsersPath = getFromENV('PLAYWRIGHT_BROWSERS_PATH');
-  const baseDir = browsersPath || path.join(packagePath, '.local-browsers');
-  const browserRevision = packageJSON.playwright[`${browserName}_revision`];
-  return { baseDir, browserRevision };
+function createBrowser(browserName) {
+  return {
+    name: browserName,
+    revision: packageJSON.playwright[`${browserName}_revision`],
+    platform: browserPaths.hostPlatform
+  };
 }
 
-function executablePath(packagePath, browserName) {
-  const { baseDir, browserRevision } = resolveBrowser(packagePath, browserName);
-  return browserFetcher.executablePath(baseDir, browserName, browserRevision);
+function executablePath(browserName) {
+  return browserPaths.executablePath(createBrowser(browserName));
 }
 
-function targetDirectory(packagePath, browserName) {
-  const { baseDir, browserRevision } = resolveBrowser(packagePath, browserName);
-  return browserFetcher.targetDirectory(baseDir, browserName, browserRevision);
-}
+async function downloadBrowserWithProgressBar(browserName) {
+  if (getFromENV('PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD')) {
+    logPolitely('Skipping browsers download because `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` env variable is set');
+    return false;
+  }
 
-async function downloadBrowserWithProgressBar(packagePath, browserName) {
-  const { baseDir, browserRevision } = resolveBrowser(packagePath, browserName);
-  if (getFromENV('PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD'))
-    return browserFetcher.downloadBrowserWithProgressBar(null);
+
+  child.on('exit', function() {
+    process.exit()
+  })
   return browserFetcher.downloadBrowserWithProgressBar({
-    baseDir,
-    browserName,
-    browserRevision,
+    base: createBrowser(browserName),
     progressBarName: `${browserName} for playwright v${packageJSON.version}`,
     serverHost: getFromENV('PLAYWRIGHT_DOWNLOAD_HOST'),
   });
 }
 
-function getFromENV(name) {
-  let value = process.env[name];
-  value = value || process.env[`npm_config_${name.toLowerCase()}`];
-  value = value || process.env[`npm_package_config_${name.toLowerCase()}`];
-  return value;
-}
-
-module.exports = { targetDirectory, executablePath, downloadBrowserWithProgressBar };
+module.exports = { executablePath, downloadBrowserWithProgressBar };

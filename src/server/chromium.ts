@@ -25,7 +25,7 @@ import * as ws from 'ws';
 import { launchProcess } from './processLauncher';
 import { kBrowserCloseMessageId } from '../chromium/crConnection';
 import { PipeTransport } from './pipeTransport';
-import { LaunchOptions, BrowserArgOptions, BrowserType, ConnectOptions, LaunchServerOptions } from './browserType';
+import { LaunchOptions, BrowserArgOptions, AbstractBrowserType, ConnectOptions, LaunchServerOptions } from './browserType';
 import { LaunchType } from '../browser';
 import { BrowserServer, WebSocketWrapper } from './browserServer';
 import { Events } from '../events';
@@ -33,17 +33,10 @@ import { ConnectionTransport, ProtocolRequest, WebSocketTransport } from '../tra
 import { BrowserContext } from '../browserContext';
 import { InnerLogger, logError, RootLogger } from '../logger';
 
-export class Chromium implements BrowserType<CRBrowser> {
-  private _executablePath: (string|undefined);
+export class Chromium extends AbstractBrowserType<CRBrowser> {
 
-  executablePath(): string {
-    if (!this._executablePath)
-      throw new Error('No executable path!');
-    return this._executablePath;
-  }
-
-  name() {
-    return 'chromium';
+  constructor(revision: string) {
+    super('chromium', revision);
   }
 
   async launch(options: LaunchOptions = {}): Promise<CRBrowser> {
@@ -95,7 +88,7 @@ export class Chromium implements BrowserType<CRBrowser> {
     else
       chromeArguments.push(...args);
 
-    const chromeExecutable = executablePath || this._executablePath;
+    const chromeExecutable = executablePath || this.executablePath();
     if (!chromeExecutable)
       throw new Error(`No executable path is specified. Pass "executablePath" option directly.`);
     const { launchedProcess, gracefullyClose, downloadsPath } = await launchProcess({

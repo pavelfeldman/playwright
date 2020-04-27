@@ -17,7 +17,7 @@
  const { downloadBrowserWithProgressBar } = require('playwright-core/download-browser');
 
 (async function() {
-  await downloadBrowserWithProgressBar(__dirname, 'chromium');
-  await downloadBrowserWithProgressBar(__dirname, 'firefox');
-  await downloadBrowserWithProgressBar(__dirname, 'webkit');
+  await downloadBrowserWithProgressBar('chromium');
+  await downloadBrowserWithProgressBar('firefox');
+  await downloadBrowserWithProgressBar('webkit');
 })();

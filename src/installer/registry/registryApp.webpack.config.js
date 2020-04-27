@@ -17,7 +17,7 @@
 const path = require('path');
 
 module.exports = {
-  entry: path.join(__dirname, 'registry.ts'),
+  entry: path.join(__dirname, 'registryApp.ts'),
   target: 'node',
   devtool: 'source-map',
   module: {
@@ -36,7 +36,7 @@ module.exports = {
     extensions: [ '.tsx', '.ts', '.js' ]
   },
   output: {
-    filename: 'registry.js',
-    path: path.resolve(__dirname, '../..')
+    filename: 'registryApp.js',
+    path: path.resolve(__dirname, '../../..')
   },
 };

@@ -16,6 +16,7 @@
 
 import { BrowserContext } from '../browserContext';
 import { BrowserServer } from './browserServer';
+import * as browserPaths from '../installer/browserPaths';
 import { Logger } from '../logger';
 
 export type BrowserArgOptions = {
@@ -49,4 +50,31 @@ export interface BrowserType<Browser> {
   launchServer(options?: LaunchServerOptions): Promise<BrowserServer>;
   launchPersistentContext(userDataDir: string, options?: LaunchOptions): Promise<BrowserContext>;
   connect(options: ConnectOptions): Promise<Browser>;
+}
+
+export abstract class AbstractBrowserType<Browser> implements BrowserType<Browser> {
+  private _name: string;
+  private _executablePath: string;
+
+  constructor(name: string, revision: string) {
+    this._name = name;
+    this._executablePath = browserPaths.executablePath({
+      name,
+      revision,
+      platform: browserPaths.hostPlatform
+    });
+  }
+
+  executablePath(): string {
+    return this._executablePath;
+  }
+
+  name(): string {
+    return this._name;
+  }
+
+  abstract launch(options?: LaunchOptions): Promise<Browser>;
+  abstract launchServer(options?: LaunchServerOptions): Promise<BrowserServer>;
+  abstract launchPersistentContext(userDataDir: string, options?: LaunchOptions): Promise<BrowserContext>;
+  abstract connect(options: ConnectOptions): Promise<Browser>;
 }

@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-import { execSync } from 'child_process';
 import * as extract from 'extract-zip';
 import * as fs from 'fs';
 import * as ProxyAgent from 'https-proxy-agent';
@@ -25,15 +24,14 @@ import * as ProgressBar from 'progress';
 import { getProxyForUrl } from 'proxy-from-env';
 import * as URL from 'url';
 import * as util from 'util';
-import { assert } from '../helper';
+import { assert, logPolitely } from '../helper';
+import * as browserCache from './browserPaths';
 
 const unlinkAsync = util.promisify(fs.unlink.bind(fs));
 const chmodAsync = util.promisify(fs.chmod.bind(fs));
 const existsAsync = (path: string): Promise<boolean> => new Promise(resolve => fs.stat(path, err => resolve(!err)));
 
 export type OnProgressCallback = (downloadedBytes: number, totalBytes: number) => void;
-export type BrowserName = ('chromium'|'webkit'|'firefox');
-export type BrowserPlatform = ('win32'|'win64'|'mac10.13'|'mac10.14'|'mac10.15'|'linux');
 
 const DEFAULT_DOWNLOAD_HOSTS = {
   chromium: 'https://storage.googleapis.com',
@@ -41,23 +39,9 @@ const DEFAULT_DOWNLOAD_HOSTS = {
   webkit: 'https://playwright.azureedge.net',
 };
 
-const hostPlatform = ((): BrowserPlatform => {
-  const platform = os.platform();
-  if (platform === 'darwin') {
-    const macVersion = execSync('sw_vers -productVersion').toString('utf8').trim().split('.').slice(0, 2).join('.');
-    return `mac${macVersion}` as BrowserPlatform;
-  }
-  if (platform === 'linux')
-    return 'linux';
-  if (platform === 'win32')
-    return os.arch() === 'x64' ? 'win64' : 'win32';
-  return platform as BrowserPlatform;
-})();
-
-function getDownloadUrl(browserName: BrowserName, platform?: BrowserPlatform): string | undefined {
-  platform = platform || hostPlatform;
+function getDownloadUrl(browserName: string, platform: browserCache.BrowserPlatform): string | undefined {
   if (browserName === 'chromium') {
-    return new Map<BrowserPlatform, string>([
+    return new Map<browserCache.BrowserPlatform, string>([
       ['linux', '%s/chromium-browser-snapshots/Linux_x64/%d/chrome-linux.zip'],
       ['mac10.13', '%s/chromium-browser-snapshots/Mac/%d/chrome-mac.zip'],
       ['mac10.14', '%s/chromium-browser-snapshots/Mac/%d/chrome-mac.zip'],
@@ -68,7 +52,7 @@ function getDownloadUrl(browserName: BrowserName, platform?: BrowserPlatform): s
   }
 
   if (browserName === 'firefox') {
-    return new Map<BrowserPlatform, string>([
+    return new Map<browserCache.BrowserPlatform, string>([
       ['linux', '%s/builds/firefox/%s/firefox-linux.zip'],
       ['mac10.13', '%s/builds/firefox/%s/firefox-mac.zip'],
       ['mac10.14', '%s/builds/firefox/%s/firefox-mac.zip'],
@@ -79,7 +63,7 @@ function getDownloadUrl(browserName: BrowserName, platform?: BrowserPlatform): s
   }
 
   if (browserName === 'webkit') {
-    return new Map<BrowserPlatform, string | undefined>([
+    return new Map<browserCache.BrowserPlatform, string | undefined>([
       ['linux', '%s/builds/webkit/%s/minibrowser-gtk-wpe.zip'],
       ['mac10.13', undefined],
       ['mac10.14', '%s/builds/webkit/%s/minibrowser-mac-10.14.zip'],
@@ -90,84 +74,28 @@ function getDownloadUrl(browserName: BrowserName, platform?: BrowserPlatform): s
   }
 }
 
-function getRelativeExecutablePath(browserName: BrowserName): string[] | undefined {
-  if (browserName === 'chromium') {
-    return new Map<BrowserPlatform, string[]>([
-      ['linux', ['chrome-linux', 'chrome']],
-      ['mac10.13', ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']],
-      ['mac10.14', ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']],
-      ['mac10.15', ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']],
-      ['win32', ['chrome-win', 'chrome.exe']],
-      ['win64', ['chrome-win', 'chrome.exe']],
-    ]).get(hostPlatform);
-  }
-
-  if (browserName === 'firefox') {
-    return new Map<BrowserPlatform, string[]>([
-      ['linux', ['firefox', 'firefox']],
-      ['mac10.13', ['firefox', 'Nightly.app', 'Contents', 'MacOS', 'firefox']],
-      ['mac10.14', ['firefox', 'Nightly.app', 'Contents', 'MacOS', 'firefox']],
-      ['mac10.15', ['firefox', 'Nightly.app', 'Contents', 'MacOS', 'firefox']],
-      ['win32', ['firefox', 'firefox.exe']],
-      ['win64', ['firefox', 'firefox.exe']],
-    ]).get(hostPlatform);
-  }
-
-  if (browserName === 'webkit') {
-    return new Map<BrowserPlatform, string[] | undefined>([
-      ['linux', ['pw_run.sh']],
-      ['mac10.13', undefined],
-      ['mac10.14', ['pw_run.sh']],
-      ['mac10.15', ['pw_run.sh']],
-      ['win32', ['Playwright.exe']],
-      ['win64', ['Playwright.exe']],
-    ]).get(hostPlatform);
-  }
-}
-
 export type DownloadOptions = {
-  baseDir: string,
-  browserName: BrowserName,
-  browserRevision: string,
+  browser: browserCache.BrowserDescriptor,
   progressBarName: string,
-  serverHost?: string,
+  serverHost?: string
 };
 
-function revisionURL(options: DownloadOptions, platform?: BrowserPlatform): string {
+function revisionURL(options: DownloadOptions): string {
   const {
-    browserName,
-    browserRevision,
-    serverHost = DEFAULT_DOWNLOAD_HOSTS[browserName],
+    browser,
+    serverHost = (DEFAULT_DOWNLOAD_HOSTS as any)[browser.name],
   } = options;
-  assert(browserRevision, `'revision' must be specified`);
-  const urlTemplate = getDownloadUrl(browserName, platform);
-  assert(urlTemplate, `ERROR: Playwright does not support ${browserName} on ${hostPlatform}`);
-  return util.format(urlTemplate, serverHost, browserRevision);
+  const urlTemplate = getDownloadUrl(browser.name, browser.platform);
+  assert(urlTemplate, `ERROR: Playwright does not support ${browser.name} on ${browser.platform}`);
+  return util.format(urlTemplate, serverHost, browser.revision);
 }
 
-export function targetDirectory(baseDir: string, browserName: string, browserRevision: string): string {
-  return path.join(baseDir, `${browserName}-${browserRevision}`);
-}
-
-export function executablePath(baseDir: string, browserName: BrowserName, browserRevision: string): string {
-  const relativePath = getRelativeExecutablePath(browserName);
-  assert(relativePath, `Unsupported platform for ${browserName}: ${hostPlatform}`);
-  return path.join(targetDirectory(baseDir, browserName, browserRevision), ...relativePath);
-}
-
-export async function downloadBrowserWithProgressBar(options: DownloadOptions | null): Promise<boolean> {
-  if (!options) {
-    logPolitely('Skipping browsers download because `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` env variable is set');
-    return false;
-  }
+export async function downloadBrowserWithProgressBar(options: DownloadOptions): Promise<boolean> {
   const {
-    baseDir,
-    browserName,
-    browserRevision,
-    progressBarName
+    browser,
+    progressBarName,
   } = options;
-  assert(baseDir, '`baseDir` must be provided');
-  const targetDir = targetDirectory(baseDir, browserName, browserRevision);
+  const targetDir = browserCache.browserDirectory(browser);
   if (await existsAsync(targetDir)) {
     // Already downloaded.
     return false;
@@ -191,11 +119,11 @@ export async function downloadBrowserWithProgressBar(options: DownloadOptions | 
   }
 
   const url = revisionURL(options);
-  const zipPath = path.join(os.tmpdir(), `playwright-download-${browserName}-${hostPlatform}-${browserRevision}.zip`);
+  const zipPath = path.join(os.tmpdir(), `playwright-download-${browser.name}-${browser.platform}-${browser.revision}.zip`);
   try {
     await downloadFile(url, zipPath, progress);
-    await extract(zipPath, {dir: targetDir});
-    await chmodAsync(executablePath(baseDir, browserName, browserRevision), 0o755);
+    await extract(zipPath, { dir: targetDir });
+    await chmodAsync(path.join(targetDir, ...browserCache.relativeExecutablePath(browser)!), 0o755);
   } catch (e) {
     process.exitCode = 1;
     throw e;
@@ -212,21 +140,11 @@ function toMegabytes(bytes: number) {
   return `${Math.round(mb * 10) / 10} Mb`;
 }
 
-function logPolitely(toBeLogged: string) {
-  const logLevel = process.env.npm_config_loglevel;
-  const logLevelDisplay = ['silent', 'error', 'warn'].indexOf(logLevel || '') > -1;
-
-  if (!logLevelDisplay)
-    console.log(toBeLogged);  // eslint-disable-line no-console
-}
-
-export async function canDownload(browserName: BrowserName, browserRevision: string, platform: BrowserPlatform): Promise<boolean> {
+export async function canDownload(browser: browserCache.BrowserDescriptor): Promise<boolean> {
   const url = revisionURL({
-    baseDir: '',
-    browserName,
-    browserRevision,
+    browser,
     progressBarName: '',
-  }, platform);
+  });
   let resolve: (result: boolean) => void = () => {};
   const promise = new Promise<boolean>(x => resolve = x);
   const request = httpRequest(url, 'HEAD', response => {

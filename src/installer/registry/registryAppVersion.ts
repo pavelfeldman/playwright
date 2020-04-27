@@ -14,12 +14,5 @@
  * limitations under the License.
  */
 
-const { Playwright } = require('playwright-core/lib/server/playwright.js');
-const packageJSON = require('./package.json');
-
-const playwright = new Playwright({
-  browsers: ['webkit', 'chromium', 'firefox'],
-  packageJSON
-});
-
-module.exports = playwright;
+// We are reading this file and are matching against this expression.
+export const REGISTRY_APP_VERSION = 4;

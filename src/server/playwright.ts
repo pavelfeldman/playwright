@@ -31,6 +31,7 @@ for (const className in api) {
 
 type PlaywrightOptions = {
   browsers: Array<('firefox'|'webkit'|'chromium')>,
+  packageJSON: any
 };
 
 export class Playwright {
@@ -44,14 +45,15 @@ export class Playwright {
   constructor(options: PlaywrightOptions) {
     const {
       browsers,
+      packageJSON
     } = options;
     this.devices = DeviceDescriptors;
     this.errors = { TimeoutError };
     if (browsers.includes('chromium'))
-      this.chromium = new Chromium();
+      this.chromium = new Chromium(packageJSON['playwright']['chromium_revision']);
     if (browsers.includes('webkit'))
-      this.webkit = new WebKit();
+      this.webkit = new WebKit(packageJSON['playwright']['webkit_revision']);
     if (browsers.includes('firefox'))
-      this.firefox = new Firefox();
+      this.firefox = new Firefox(packageJSON['playwright']['firefox_revision']);
   }
 }
