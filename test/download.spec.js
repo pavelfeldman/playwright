@@ -19,7 +19,7 @@ const path = require('path');
 const {FFOX, CHROMIUM, WEBKIT, MAC, WIN} = require('./utils').testOptions(browserType);
 
 describe('Download', function() {
-  beforeEach(async(state) => {
+  beforeAll(async(state) => {
     state.server.setRoute('/download', (req, res) => {
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', 'attachment');

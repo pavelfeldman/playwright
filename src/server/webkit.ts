@@ -20,7 +20,7 @@ import { Env } from './processLauncher';
 import * as path from 'path';
 import { helper } from '../helper';
 import { kBrowserCloseMessageId } from '../webkit/wkConnection';
-import { BrowserArgOptions, BrowserTypeBase, processBrowserArgOptions } from './browserType';
+import { LaunchOptionsBase, BrowserTypeBase, processBrowserArgOptions } from './browserType';
 import { ConnectionTransport, SequenceNumberMixer } from '../transport';
 import * as ws from 'ws';
 import { WebSocketWrapper } from './browserServer';
@@ -45,11 +45,11 @@ export class WebKit extends BrowserTypeBase {
     transport.send({method: 'Playwright.close', params: {}, id: kBrowserCloseMessageId});
   }
 
-  _wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number): WebSocketWrapper {
-    return wrapTransportWithWebSocket(transport, logger, port);
+  _wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number, downloadsPath: string): WebSocketWrapper {
+    return wrapTransportWithWebSocket(transport, logger, port, downloadsPath);
   }
 
-  _defaultArgs(options: BrowserArgOptions, isPersistent: boolean, userDataDir: string): string[] {
+  _defaultArgs(options: LaunchOptionsBase, isPersistent: boolean, userDataDir: string): string[] {
     const { devtools, headless } = processBrowserArgOptions(options);
     const { args = [], proxy } = options;
     if (devtools)
@@ -88,15 +88,29 @@ export class WebKit extends BrowserTypeBase {
   }
 }
 
-function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number): WebSocketWrapper {
+type PageProxyData = {
+  socket: ws,
+  downloadUuids: string[],
+};
+
+function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number, downloadsPath: string): WebSocketWrapper {
   const server = new ws.Server({ port });
   const guid = helper.guid();
   const idMixer = new SequenceNumberMixer<{id: number, socket: ws}>();
   const pendingBrowserContextCreations = new Set<number>();
   const pendingBrowserContextDeletions = new Map<number, string>();
   const browserContextIds = new Map<string, ws>();
-  const pageProxyIds = new Map<string, ws>();
+  const pageProxyIds = new Map<string, PageProxyData>();
   const sockets = new Set<ws>();
+
+  function removePageProxy(pageProxyId: string): PageProxyData | undefined {
+    const data = pageProxyIds.get(pageProxyId);
+    if (!data)
+      return;
+    pageProxyIds.delete(pageProxyId);
+    helper.removeFolders(data.downloadUuids.map(uuid => path.join(downloadsPath, uuid)));
+    return data;
+  }
 
   transport.onmessage = message => {
     if (typeof message.id === 'number') {
@@ -140,12 +154,12 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
     // Process notification response.
     const { method, params, pageProxyId } = message;
     if (pageProxyId) {
-      const socket = pageProxyIds.get(pageProxyId);
-      if (!socket || socket.readyState === ws.CLOSING) {
+      const data = pageProxyIds.get(pageProxyId);
+      if (!data || data.socket.readyState === ws.CLOSING) {
         // Drop unattributed messages on the floor.
         return;
       }
-      socket.send(JSON.stringify(message));
+      data.socket.send(JSON.stringify(message));
       return;
     }
     if (method === 'Playwright.pageProxyCreated') {
@@ -154,22 +168,27 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
         // Drop unattributed messages on the floor.
         return;
       }
-      pageProxyIds.set(params.pageProxyInfo.pageProxyId, socket);
+      pageProxyIds.set(params.pageProxyInfo.pageProxyId, { socket, downloadUuids: [] });
       socket.send(JSON.stringify(message));
       return;
     }
     if (method === 'Playwright.pageProxyDestroyed') {
-      const socket = pageProxyIds.get(params.pageProxyId);
-      pageProxyIds.delete(params.pageProxyId);
-      if (socket && socket.readyState !== ws.CLOSING)
-        socket.send(JSON.stringify(message));
+      const data = removePageProxy(params.pageProxyId);
+      if (data && data.socket.readyState !== ws.CLOSING)
+        data.socket.send(JSON.stringify(message));
       return;
     }
     if (method === 'Playwright.provisionalLoadFailed') {
-      const socket = pageProxyIds.get(params.pageProxyId);
-      if (socket && socket.readyState !== ws.CLOSING)
-        socket.send(JSON.stringify(message));
+      const data = pageProxyIds.get(params.pageProxyId);
+      if (data && data.socket.readyState !== ws.CLOSING)
+        data.socket.send(JSON.stringify(message));
       return;
+    }
+
+    if (method === 'Playwright.downloadCreated') {
+      const data = pageProxyIds.get(params.pageProxyId);
+      if (data)
+        data.downloadUuids.push(params.uuid);
     }
   };
 
@@ -194,6 +213,11 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
       const parsedMessage = JSON.parse(Buffer.from(message).toString());
       const { id, method, params } = parsedMessage;
       const seqNum = idMixer.generate({ id, socket });
+
+      // Make sure server-defined downloadPath to be used.
+      if (parsedMessage.method === 'Playwright.setDownloadBehavior')
+        parsedMessage.params.downloadPath = downloadsPath;
+
       transport.send({ ...parsedMessage, id: seqNum });
       if (method === 'Playwright.createContext')
         pendingBrowserContextCreations.add(seqNum);
@@ -204,9 +228,9 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
     socket.on('error', logError(logger));
 
     socket.on('close', (socket as any).__closeListener = () => {
-      for (const [pageProxyId, s] of pageProxyIds) {
-        if (s === socket)
-          pageProxyIds.delete(pageProxyId);
+      for (const [pageProxyId, data] of pageProxyIds) {
+        if (data.socket === socket)
+          removePageProxy(pageProxyId);
       }
       for (const [browserContextId, s] of browserContextIds) {
         if (s === socket) {

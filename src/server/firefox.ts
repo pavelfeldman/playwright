@@ -23,7 +23,7 @@ import { FFBrowser } from '../firefox/ffBrowser';
 import { kBrowserCloseMessageId } from '../firefox/ffConnection';
 import { helper } from '../helper';
 import { WebSocketWrapper } from './browserServer';
-import { BrowserArgOptions, BrowserTypeBase, processBrowserArgOptions, FirefoxUserPrefsOptions } from './browserType';
+import { LaunchOptionsBase, BrowserTypeBase, processBrowserArgOptions, FirefoxUserPrefsOptions } from './browserType';
 import { Env } from './processLauncher';
 import { ConnectionTransport, SequenceNumberMixer } from '../transport';
 import { InnerLogger, logError } from '../logger';
@@ -53,11 +53,11 @@ export class Firefox extends BrowserTypeBase {
     transport.send(message);
   }
 
-  _wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number): WebSocketWrapper {
-    return wrapTransportWithWebSocket(transport, logger, port);
+  _wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number, downloadsPath: string): WebSocketWrapper {
+    return wrapTransportWithWebSocket(transport, logger, port, downloadsPath);
   }
 
-  _defaultArgs(options: BrowserArgOptions & FirefoxUserPrefsOptions, isPersistent: boolean, userDataDir: string): string[] {
+  _defaultArgs(options: LaunchOptionsBase & FirefoxUserPrefsOptions, isPersistent: boolean, userDataDir: string): string[] {
     const { devtools, headless } = processBrowserArgOptions(options);
     const { args = [], proxy } = options;
     if (devtools)
@@ -108,15 +108,30 @@ export class Firefox extends BrowserTypeBase {
   }
 }
 
-function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number): WebSocketWrapper {
+type SessionData = {
+ socket: ws,
+ downloadUuids: string[],
+};
+
+function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number, downloadsPath: string): WebSocketWrapper {
   const server = new ws.Server({ port });
   const guid = helper.guid();
   const idMixer = new SequenceNumberMixer<{id: number, socket: ws}>();
   const pendingBrowserContextCreations = new Set<number>();
   const pendingBrowserContextDeletions = new Map<number, string>();
   const browserContextIds = new Map<string, ws>();
-  const sessionToSocket = new Map<string, ws>();
+  const sessionToData = new Map<string, SessionData>();
   const sockets = new Set<ws>();
+
+  function removeSession(sessionId: string): SessionData | undefined {
+    const data = sessionToData.get(sessionId);
+    if (!data)
+      return;
+    sessionToData.delete(sessionId);
+    helper.removeFolders(data.downloadUuids.map(uuid => path.join(downloadsPath, uuid)));
+    data.downloadUuids = [];
+    return data;
+  }
 
   transport.onmessage = message => {
     if (typeof message.id === 'number') {
@@ -159,12 +174,12 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
     // Process notification response.
     const { method, params, sessionId } = message;
     if (sessionId) {
-      const socket = sessionToSocket.get(sessionId);
-      if (!socket || socket.readyState === ws.CLOSING) {
+      const data = sessionToData.get(sessionId);
+      if (!data || data.socket.readyState === ws.CLOSING) {
         // Drop unattributed messages on the floor.
         return;
       }
-      socket.send(JSON.stringify(message));
+      data.socket.send(JSON.stringify(message));
       return;
     }
     if (method === 'Browser.attachedToTarget') {
@@ -173,16 +188,20 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
         // Drop unattributed messages on the floor.
         return;
       }
-      sessionToSocket.set(params.sessionId, socket);
+      sessionToData.set(params.sessionId, { socket, downloadUuids: [] });
       socket.send(JSON.stringify(message));
       return;
     }
     if (method === 'Browser.detachedFromTarget') {
-      const socket = sessionToSocket.get(params.sessionId);
-      sessionToSocket.delete(params.sessionId);
-      if (socket && socket.readyState !== ws.CLOSING)
-        socket.send(JSON.stringify(message));
+      const data = removeSession(params.sessionId);
+      if (data && data.socket.readyState !== ws.CLOSING)
+        data.socket.send(JSON.stringify(message));
       return;
+    }
+    if (method === 'Browser.downloadCreated') {
+      const data = sessionToData.get(params.sessionId);
+      if (data)
+        data.downloadUuids.push(params.uuid);
     }
   };
 
@@ -207,6 +226,11 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
       const parsedMessage = JSON.parse(Buffer.from(message).toString());
       const { id, method, params } = parsedMessage;
       const seqNum = idMixer.generate({ id, socket });
+
+      // Make sure server-defined downloadPath to be used.
+      if (parsedMessage.method === 'Browser.setDownloadOptions')
+        parsedMessage.params.downloadsDir = downloadsPath;
+
       transport.send({ ...parsedMessage, id: seqNum });
       if (method === 'Browser.createBrowserContext')
         pendingBrowserContextCreations.add(seqNum);
@@ -234,5 +258,5 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
   const address = server.address();
   const wsEndpoint = typeof address === 'string' ? `${address}/${guid}` : `ws://127.0.0.1:${address.port}/${guid}`;
   return new WebSocketWrapper(wsEndpoint,
-      [pendingBrowserContextCreations, pendingBrowserContextDeletions, browserContextIds, sessionToSocket, sockets]);
+      [pendingBrowserContextCreations, pendingBrowserContextDeletions, browserContextIds, sessionToData, sockets]);
 }

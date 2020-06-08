@@ -28,7 +28,7 @@ import { Log, InnerLogger, Logger, RootLogger } from './logger';
 import { FunctionWithSource } from './frames';
 import * as debugSupport from './debug/debugSupport';
 
-export type PersistentContextOptions = {
+type CommonContextOptions = {
   viewport?: types.Size | null,
   ignoreHTTPSErrors?: boolean,
   javaScriptEnabled?: boolean,
@@ -45,10 +45,11 @@ export type PersistentContextOptions = {
   isMobile?: boolean,
   hasTouch?: boolean,
   colorScheme?: types.ColorScheme,
+  acceptDownloads?: boolean,
 };
 
-export type BrowserContextOptions = PersistentContextOptions & {
-  acceptDownloads?: boolean,
+export type PersistentContextOptions = CommonContextOptions;
+export type BrowserContextOptions = CommonContextOptions & {
   logger?: Logger,
 };
 
@@ -122,7 +123,8 @@ export abstract class BrowserContextBase extends ExtendedEventEmitter implements
     this._closed = true;
     this.emit(Events.BrowserContext.Close);
     this._closePromiseFulfill!(new Error('Context closed'));
-    if (!omitDeleteDownloads)
+    // For the connect() case, downloadsPath is empty.
+    if (this._browserBase._options.downloadsPath && !omitDeleteDownloads)
       await Promise.all([...this._downloads].map(d => d.delete()));
     this._downloads.clear();
   }

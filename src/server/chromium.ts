@@ -21,7 +21,7 @@ import { CRBrowser } from '../chromium/crBrowser';
 import * as ws from 'ws';
 import { Env } from './processLauncher';
 import { kBrowserCloseMessageId } from '../chromium/crConnection';
-import { BrowserArgOptions, BrowserTypeBase, processBrowserArgOptions } from './browserType';
+import { LaunchOptionsBase, BrowserTypeBase, processBrowserArgOptions } from './browserType';
 import { WebSocketWrapper } from './browserServer';
 import { ConnectionTransport, ProtocolRequest } from '../transport';
 import { InnerLogger, logError } from '../logger';
@@ -73,11 +73,11 @@ export class Chromium extends BrowserTypeBase {
     transport.send(message);
   }
 
-  _wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number): WebSocketWrapper {
-    return wrapTransportWithWebSocket(transport, logger, port);
+  _wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number, downloadsPath: string): WebSocketWrapper {
+    return wrapTransportWithWebSocket(transport, logger, port, downloadsPath);
   }
 
-  _defaultArgs(options: BrowserArgOptions, isPersistent: boolean, userDataDir: string): string[] {
+  _defaultArgs(options: LaunchOptionsBase, isPersistent: boolean, userDataDir: string): string[] {
     const { devtools, headless } = processBrowserArgOptions(options);
     const { args = [], proxy } = options;
     const userDataDirArg = args.find(arg => arg.startsWith('--user-data-dir'));
@@ -130,9 +130,10 @@ type SessionData = {
   children: Set<string>,
   isBrowserSession: boolean,
   parent?: string,
+  dowloadGuids: string[],
 };
 
-function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number): WebSocketWrapper {
+function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: InnerLogger, port: number, downloadsPath: string): WebSocketWrapper {
   const server = new ws.Server({ port });
   const guid = helper.guid();
 
@@ -146,7 +147,8 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
       socket,
       children: new Set(),
       isBrowserSession: !parentSessionId,
-      parent: parentSessionId
+      parent: parentSessionId,
+      dowloadGuids: []
     });
     if (parentSessionId)
       sessionToData.get(parentSessionId)!.children.add(sessionId);
@@ -159,6 +161,8 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
     if (data.parent)
       sessionToData.get(data.parent)!.children.delete(sessionId);
     sessionToData.delete(sessionId);
+    helper.removeFolders(data.dowloadGuids.map(guid => path.join(downloadsPath, guid)));
+    data.dowloadGuids = [];
   }
 
   transport.onmessage = message => {
@@ -196,6 +200,8 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
         addSession(message.params.sessionId, data.socket, message.sessionId);
       if (message.method === 'Target.detachedFromTarget')
         removeSession(message.params.sessionId);
+      if (message.method === 'Page.downloadWillBegin')
+        data.dowloadGuids.push(message.params.guid);
       // Strip session ids from the browser sessions.
       if (data.isBrowserSession)
         delete message.sessionId;
@@ -231,6 +237,11 @@ function wrapTransportWithWebSocket(transport: ConnectionTransport, logger: Inne
       const parsedMessage = JSON.parse(Buffer.from(message).toString()) as ProtocolRequest;
       // If message has sessionId, pass through.
       if (parsedMessage.sessionId) {
+
+        // Make sure server-defined downloadPath to be used.
+        if (parsedMessage.method === 'Browser.setDownloadBehavior')
+          parsedMessage.params.downloadPath = downloadsPath;
+
         transport.send(parsedMessage);
         return;
       }
