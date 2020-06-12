@@ -26,34 +26,26 @@ export class RecorderController {
 
   constructor(page: Page) {
     this._page = page;
-  }
-
-  start() {
-    this._script.addAction({
-      name: 'navigate',
-      url: this._page.url(),
-      signals: [],
-    });
-    this._printScript();
 
     this._page.exposeBinding('recordPlaywrightAction', (source, action: actions.Action) => {
-      action.frameUrl = source.frame.url();
+      if (source.frame !== this._page.mainFrame())
+        action.frameUrl = source.frame.url();
       this._script.addAction(action);
-      this._printScript();
     });
 
     this._page.on(Events.Page.FrameNavigated, (frame: frames.Frame) => {
-      if (frame.parentFrame())
-        return;
-      const action = this._script.lastAction();
-      if (action)
-        action.signals.push({ name: 'navigation', url: frame.url() });
-      this._printScript();
+      // if (frame.parentFrame())
+      //   return;
+      // const action = this._script.lastAction();
+      // if (action) {
+      //   action.signals.push({ name: 'navigation', url: frame.url() });
+      // } else {
+      //   this._script.addAction({
+      //     name: 'navigate',
+      //     url: this._page.url(),
+      //     signals: [],
+      //   });
+      // }
     });
-  }
-
-  _printScript() {
-    console.log('\x1Bc');  // eslint-disable-line no-console
-    console.log(this._script.generate('chromium'));  // eslint-disable-line no-console
   }
 }

@@ -62,7 +62,7 @@ export const formatColors: { cst: StringFormatter; kwd: StringFormatter; fnc: St
   fnc: text => `\u001b[38;5;223m${text}\x1b[0m`,
   prp: text => `\u001b[38;5;159m${text}\x1b[0m`,
   str: text => `\u001b[38;5;130m${quote(text)}\x1b[0m`,
-  cmt: text => `// \u001b[38;5;23m${text}\x1b[0m`
+  cmt: text => `\u001b[38;5;23m// ${text}\x1b[0m`
 };
 
 function quote(text: string, char: string = '\'') {

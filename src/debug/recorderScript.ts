@@ -19,115 +19,128 @@ import { Formatter, formatColors } from '../utils/formatter';
 import { Action, NavigationSignal, actionTitle } from './recorderActions';
 
 export class Script {
-  private _actions: Action[] = [];
+  private _lastAction: Action | undefined;
 
   addAction(action: Action) {
-    this._actions.push(action);
-  }
-
-  lastAction(): Action | undefined {
-    return this._actions[this._actions.length - 1];
-  }
-
-  private _compact(): Action[] {
-    const result: Action[] = [];
-    let lastAction: Action | undefined;
-    for (const action of this._actions) {
-      if (lastAction && action.name === 'fill' && lastAction.name === 'fill') {
-        if (action.selector === lastAction.selector)
-          result.pop();
-      }
-      if (lastAction && action.name === 'click' && lastAction.name === 'click') {
-        if (action.selector === lastAction.selector && action.clickCount > lastAction.clickCount)
-          result.pop();
-      }
-      for (const name of ['check', 'uncheck']) {
-        if (lastAction && action.name === name && lastAction.name === 'click') {
-          if ((action as any).selector === (lastAction as any).selector)
-            result.pop();
-        }
-      }
-      lastAction = action;
-      result.push(action);
+    let restoreCursor = false;
+    if (this._lastAction && action.name === 'fill' && this._lastAction.name === 'fill') {
+      if (action.selector === this._lastAction.selector)
+        restoreCursor = true;
     }
-    return result;
+    if (this._lastAction && action.name === 'click' && this._lastAction.name === 'click') {
+      if (action.selector === this._lastAction.selector && action.clickCount > this._lastAction.clickCount)
+        restoreCursor = true;
+    }
+    for (const name of ['check', 'uncheck']) {
+      if (this._lastAction && action.name === name && this._lastAction.name === 'click') {
+        if ((action as any).selector === (this._lastAction as any).selector)
+          restoreCursor = true;
+      }
+    }
+    this._lastAction = action;
+    if (restoreCursor)
+      console.log('\x1B[u RESTORE ' + this.generateAction(action));
+    else
+      console.log('\x1B[s RESTORE ' + this.generateAction(action));
   }
 
-  generate(browserType: string) {
+      // lastAction = action;
+      // console.log('\x1B[s');
+      // console.log('\x1B[u');
+      // console.log(this._script.generateAction(action));
+    
+      // _printScript() {
+      //   console.log(this._script.generate('chromium'));  // eslint-disable-line no-console
+      // }
+
+  // generate(browserType: string) {
+  //   const formatter = new Formatter();
+  //   const { cst, fnc, kwd, str } = formatColors;
+
+  //   formatter.add(`
+  //     ${kwd('const')} { ${cst('chromium')}, ${cst('firefox')}, ${cst('webkit')} } = ${fnc('require')}(${str('playwright')});
+
+  //     (${kwd('async')}() => {
+  //       ${kwd('const')} ${cst('browser')} = ${kwd('await')} ${cst(`${browserType}`)}.${fnc('launch')}();
+  //       ${kwd('const')} ${cst('page')} = ${kwd('await')} ${cst('browser')}.${fnc('newPage')}();
+  //   `);
+
+  //   for (const action of this._compact()) {
+  //     formatter.newLine();
+  //     this._generateAction(formatter, action);
+  //   }
+
+  //   formatter.add(`
+  //     })();
+  //   `);
+
+  //   return formatter.format();
+  // }
+
+  generateAction(action: Action): string {
     const formatter = new Formatter();
-    const { cst, cmt, fnc, kwd, prp, str } = formatColors;
-
-    formatter.add(`
-      ${kwd('const')} { ${cst('chromium')}. ${cst('firefox')}, ${cst('webkit')} } = ${fnc('require')}(${str('playwright')});
-
-      (${kwd('async')}() => {
-        ${kwd('const')} ${cst('browser')} = ${kwd('await')} ${cst(`${browserType}`)}.${fnc('launch')}();
-        ${kwd('const')} ${cst('page')} = ${kwd('await')} ${cst('browser')}.${fnc('newPage')}();
-    `);
-
-    for (const action of this._compact()) {
-      formatter.newLine();
-      formatter.add(cmt(actionTitle(action)));
-      let navigationSignal: NavigationSignal | undefined;
-      if (action.name !== 'navigate' && action.signals && action.signals.length)
-        navigationSignal = action.signals[action.signals.length - 1];
-
-      if (navigationSignal) {
-        formatter.add(`${kwd('await')} ${cst('Promise')}.${fnc('all')}([
-          ${cst('page')}.${fnc('waitForNavigation')}({ ${prp('url')}: ${str(navigationSignal.url)} }),`);
-      }
-
-      const subject = action.frameUrl ?
-        `${cst('page')}.${fnc('frame')}(${formatObject({ url: action.frameUrl })})` : cst('page');
-
-      const prefix = navigationSignal ? '' : kwd('await') + ' ';
-      const suffix = navigationSignal ? '' : ';';
-      switch (action.name)  {
-        case 'click': {
-          let method = 'click';
-          if (action.clickCount === 2)
-            method = 'dblclick';
-          const modifiers = toModifiers(action.modifiers);
-          const options: dom.ClickOptions = {};
-          if (action.button !== 'left')
-            options.button = action.button;
-          if (modifiers.length)
-            options.modifiers = modifiers;
-          if (action.clickCount > 2)
-            options.clickCount = action.clickCount;
-          const optionsString = formatOptions(options);
-          formatter.add(`${prefix}${subject}.${fnc(method)}(${str(action.selector)}${optionsString})${suffix}`);
-          break;
-        }
-        case 'check':
-          formatter.add(`${prefix}${subject}.${fnc('check')}(${str(action.selector)})${suffix}`);
-          break;
-        case 'uncheck':
-          formatter.add(`${prefix}${subject}.${fnc('uncheck')}(${str(action.selector)})${suffix}`);
-          break;
-        case 'fill':
-          formatter.add(`${prefix}${subject}.${fnc('fill')}(${str(action.selector)}, ${str(action.text)})${suffix}`);
-          break;
-        case 'press': {
-          const modifiers = toModifiers(action.modifiers);
-          const shortcut = [...modifiers, action.key].join('+');
-          formatter.add(`${prefix}${subject}.${fnc('press')}(${str(action.selector)}, ${str(shortcut)})${suffix}`);
-          break;
-        }
-        case 'navigate':
-          formatter.add(`${prefix}${subject}.${fnc('goto')}(${str(action.url)})${suffix}`);
-          break;
-        case 'select':
-          formatter.add(`${prefix}${subject}.${fnc('select')}(${str(action.selector)}, ${formatObject(action.options.length > 1 ? action.options : action.options[0])})${suffix}`);
-          break;
-      }
-      if (navigationSignal)
-        formatter.add(`]);`);
-    }
-    formatter.add(`
-      })();
-    `);
+    this._generateAction(formatter, action);
     return formatter.format();
+  }
+
+  private _generateAction(formatter: Formatter, action: Action) {
+    const { cst, cmt, fnc, kwd, prp, str } = formatColors;
+    formatter.add(cmt(actionTitle(action)));
+    let navigationSignal: NavigationSignal | undefined;
+    if (action.name !== 'navigate' && action.signals && action.signals.length)
+      navigationSignal = action.signals[action.signals.length - 1];
+
+    if (navigationSignal) {
+      formatter.add(`${kwd('await')} ${cst('Promise')}.${fnc('all')}([
+        ${cst('page')}.${fnc('waitForNavigation')}({ ${prp('url')}: ${str(navigationSignal.url)} }),`);
+    }
+
+    const subject = action.frameUrl ?
+      `${cst('page')}.${fnc('frame')}(${formatObject({ url: action.frameUrl })})` : cst('page');
+
+    const prefix = navigationSignal ? '' : kwd('await') + ' ';
+    const suffix = navigationSignal ? '' : ';';
+    switch (action.name)  {
+      case 'click': {
+        let method = 'click';
+        if (action.clickCount === 2)
+          method = 'dblclick';
+        const modifiers = toModifiers(action.modifiers);
+        const options: dom.ClickOptions = {};
+        if (action.button !== 'left')
+          options.button = action.button;
+        if (modifiers.length)
+          options.modifiers = modifiers;
+        if (action.clickCount > 2)
+          options.clickCount = action.clickCount;
+        const optionsString = formatOptions(options);
+        formatter.add(`${prefix}${subject}.${fnc(method)}(${str(action.selector)}${optionsString})${suffix}`);
+        break;
+      }
+      case 'check':
+        formatter.add(`${prefix}${subject}.${fnc('check')}(${str(action.selector)})${suffix}`);
+        break;
+      case 'uncheck':
+        formatter.add(`${prefix}${subject}.${fnc('uncheck')}(${str(action.selector)})${suffix}`);
+        break;
+      case 'fill':
+        formatter.add(`${prefix}${subject}.${fnc('fill')}(${str(action.selector)}, ${str(action.text)})${suffix}`);
+        break;
+      case 'press': {
+        const modifiers = toModifiers(action.modifiers);
+        const shortcut = [...modifiers, action.key].join('+');
+        formatter.add(`${prefix}${subject}.${fnc('press')}(${str(action.selector)}, ${str(shortcut)})${suffix}`);
+        break;
+      }
+      case 'navigate':
+        formatter.add(`${prefix}${subject}.${fnc('goto')}(${str(action.url)})${suffix}`);
+        break;
+      case 'select':
+        formatter.add(`${prefix}${subject}.${fnc('select')}(${str(action.selector)}, ${formatObject(action.options.length > 1 ? action.options : action.options[0])})${suffix}`);
+        break;
+    }
+    if (navigationSignal)
+      formatter.add(`]);`);
   }
 }
 
