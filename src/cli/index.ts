@@ -24,6 +24,7 @@ import { BrowserType, LaunchOptions } from '../server/browserType';
 import { DeviceDescriptors } from '../deviceDescriptors';
 import { BrowserContextOptions } from '../browserContext';
 import { helper } from '../helper';
+import { runRpcServer } from '../rpc/rpcServer';
 
 const playwright = new Playwright(__dirname, require('../../browsers.json')['browsers']);
 
@@ -58,6 +59,11 @@ program
       console.log('  $ record');
       console.log('  $ -b webkit record https://example.com');
     });
+
+program
+    .command('serve')
+    .description('start a server')
+    .action(() => runRpcServer());
 
 const browsers = [
   { initial: 'cr', name: 'Chromium', type: 'chromium' },
