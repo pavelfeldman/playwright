@@ -17,6 +17,7 @@ import json
 import os
 import subprocess
 from pyee import EventEmitter
+from types import SimpleNamespace
 from typing import Awaitable, Callable, Dict, List, Union, Optional
 
 
@@ -40,12 +41,12 @@ class Connection(EventEmitter):
         break
       await asyncio.sleep(0)
 
-  def send(self, domain: str, method: str, guid: str, params: dict = None) -> Awaitable:
+  def send(self, guid: str, method: str, params: dict = None) -> Awaitable:
     if params is None:
       params = dict()
     self._lastId += 1
     id = self._lastId
-    msg = json.dumps(dict(id=id, method='%s.%s' % (domain, method), params=params, guid=guid))
+    msg = json.dumps(dict(id=id, method=method, params=params, guid=guid))
     self._output.write(bytes(msg, 'utf-8'))
     self._output.write(b'\0')
     # print('SEND> %s' % msg)
@@ -56,33 +57,32 @@ class Connection(EventEmitter):
   def lookup_remote_object(self, guid: str):
     return self._channels[guid].object
 
-  def create_remote_object(self, type: str, guid: str, params: Dict):
+  def create_remote_object(self, type: str, guid: str):
     channel = Channel(self, type, guid)
     self._channels[guid] = channel
-    result = None
     if type == 'browserType':
-      result = BrowserType(channel)
+      return BrowserType(channel)
     if type == 'browser':
-      result = Browser(channel)
+      return Browser(channel)
     if type == 'context':
-      browser = self._channels[params.get('browserGuid')]
-      result = BrowserContext(browser.object, channel)
-    if type == 'elementHandle':
-      page = self._channels[params.get('pageGuid')]
-      result = ElementHandle(page.object, channel)
+      return BrowserContext(channel)
     if type == 'page':
-      context = self._channels[params.get('contextGuid')]
-      result = Page(context.object, channel)
-    channel.object = result
-    return result
+      return Page(channel)
+    if type == 'frame':
+      return Frame(channel)
+    if type == 'elementHandle':
+      return ElementHandle(channel)
 
   async def _on_message(self, message: str) -> None:
-    # print('RECV> %s' % len(message))
+    # print('RECV> %s' % message)
     msg = json.loads(message)
-    if msg.get('method') == 'created':
-      self.create_remote_object(msg.get('type'),  msg.get('guid'), msg.get('params'))
+    if msg.get('method') == '__create__':
+      self.create_remote_object(msg.get('type'),  msg.get('guid'))
       return
-    if msg.get('method') == 'disposed':
+    if msg.get('method') == '__init__':
+      self.lookup_remote_object(msg.get('guid'))._initialize(msg.get('params'), self._channels)
+      return
+    if msg.get('method') == '__dispose__':
       self._channels.pop(msg.get('guid'))
       return
     if msg.get('id') in self._callbacks:
@@ -116,30 +116,106 @@ class Channel(EventEmitter):
     self.object = None
 
   def send(self, method: str, params: dict = None) -> Awaitable:
-    return self._connection.send(self._type, method, self._guid, params)
+    return self._connection.send(self._guid, method, params)
 
   def _on_message(self, method: str, params: Dict):
     self.emit(method, params)
 
-class ElementHandle:
-  def __init__(self, page: 'Page', channel: Channel) -> None:
-    self._channel = channel
-    self._page = page
 
-  async def click(self, options: dict = None) -> None:
-    await self._channel.send('click', dict(options=options))
-
-  async def textContent(self) -> str: 
-    return await self._channel.send('textContent')
-
-class Page(EventEmitter):
-  def __init__(self, context: "BrowserContext", channel: Channel) -> None:
+class ChannelOwner(EventEmitter):
+  def __init__(self, channel: Channel) -> None:
     super().__init__()
-    self._context = context
-    self._context._pages.append(self)
-    self._context.emit('page', self)
     self._channel = channel
-    self._channel.on('close', lambda _: self._onClose())
+    channel.object = self
+
+
+class BrowserType(ChannelOwner):
+
+  def __init__(self, channel: Channel) -> None:
+    self._channel = channel
+
+  def _initialize(self, params: Dict, channels: Dict[int, Channel]) -> None: 
+    return
+
+  async def launch(self, options: dict = None) -> 'Browser':
+    return await self._channel.send('launch', dict(options=options))
+
+
+class Browser(ChannelOwner):
+
+  def __init__(self, channel: Channel) -> None:
+    super().__init__(channel)
+
+  def _initialize(self, params: Dict, channels: Dict[int, Channel]) -> None: 
+    self._contexts: List['BrowserContext'] = list()
+    self._channel.on('contextCreated', lambda context: self._contexts.append(context))
+    self._channel.on('contextClosed', lambda context: self._contexts.remove(context))
+
+  def contexts(self) -> List['BrowserContext']:
+    return self._contexts
+
+  async def newContext(self, options: dict = None) -> None:
+    return await self._channel.send('newContext', dict(options=options))
+
+  async def newPage(self, options: dict = None) -> None:
+    return await self._channel.send('newPage', dict(options=options))
+
+  async def close(self) -> None:
+    await self._channel.send('close')
+
+
+class BrowserContext(ChannelOwner):
+
+  Events = SimpleNamespace(
+      Close='close',
+      Page='page',
+  )
+
+  def __init__(self, channel: Channel) -> None:
+    super().__init__(channel)
+
+  def _initialize(self, params: Dict, channels: Dict[int, Channel]) -> None: 
+    self._browser = channels[params.get('browserGuid')].object
+    self._pages: List['Page'] = list()
+    self._channel.on('pageCreated', lambda page: self._on_page_created(page))
+    self._channel.on('pageClosed', lambda page: self._pages.remove(page))
+    self._channel.on('close', lambda _: self.emit(BrowserContext.Events.Close))
+
+  async def close(self) -> None:
+    return await self._channel.send('close')
+
+  async def newPage(self) -> None:
+    return await self._channel.send('newPage')
+
+  def pages(self) -> List['Page']:
+    return self._pages
+
+  def _on_page_created(self, page: 'Page') -> None:
+    self._pages.append(page)
+    self.emit(BrowserContext.Events.Page, page)
+
+
+class Page(ChannelOwner):
+
+  Events = SimpleNamespace(
+      Close='close',
+      FrameNavigated='framenavigated'
+  )
+
+  def __init__(self, channel: Channel) -> None:
+    super().__init__(channel)
+
+  def _initialize(self, params: Dict, channels: Dict[int, Channel]) -> None: 
+    self._context = channels[params.get('contextGuid')].object
+    self._main_frame = channels[params.get('mainFrameGuid')].object
+
+    self._frames: List[Frame] = []
+    for frame_guid in params.get('frameGuids'):
+      self._frames.append(channels[frame_guid].object)
+
+    self._channel.on('frameAttached', lambda frame: self._frames.append(frame))
+    self._channel.on('frameDetached', lambda frame: self._frames.remove(frame))
+    self._channel.on('close', lambda _: self.emit(Page.Events.Close))
 
   async def click(self, selector: str, options: dict = None) -> None:
     await self._channel.send('click', dict(selector=selector, options=options))
@@ -159,59 +235,76 @@ class Page(EventEmitter):
   async def title(self) -> str:
     return await self._channel.send('title')
 
-  def _onClose(self) -> None:
-    self._context._pages.remove(self)
-    self.emit('close', self)
+  @property
+  def mainFrame(self) -> 'Frame':
+    return self._main_frame
+
+  @property
+  def frames(self) -> List['Frame']:
+    return self._frames
 
 
-class BrowserContext(EventEmitter):
-  def __init__(self, browser: "Browser", channel: Channel) -> None:
-    super().__init__()
-    self._channel = channel
-    self._browser = browser
-    self._browser._contexts.append(self)
-    self._pages: List[Page] = list()
-    self._channel.on('close', lambda _: self._onClose())
+class Frame(ChannelOwner):
 
-  async def close(self) -> None:
-    return await self._channel.send('close')
-
-  async def new_page(self) -> None:
-    return await self._channel.send('newPage')
-
-  def pages(self) -> List[Page]:
-    return self._pages
-
-  def _onClose(self) -> None:
-    self._browser._contexts.remove(self)
-    self.emit('close', self)
-
-
-class Browser(EventEmitter):
   def __init__(self, channel: Channel) -> None:
-    super().__init__()
-    self._contexts: List[BrowserContext] = list()
-    self._channel = channel
+    super().__init__(channel)
 
-  def contexts(self) -> List[BrowserContext]:
-    return self._contexts
+  def _initialize(self, params: Dict, channels: Dict[int, Channel]) -> None: 
+    self._page = channels[params.get('pageGuid')].object
+    self._name = params.get('name')
+    self._url = params.get('url')
+    self._is_detached = params.get('isDetached')
 
-  async def new_context(self, options: dict = None) -> None:
-    return await self._channel.send('newContext', dict(options=options))
+    self._parent_frame: Optional[Frame] = None
+    if params.get('parentFrameGuid'):
+      self._parent_frame = channels[params.get('parentFrameGuid')].object
 
-  async def new_page(self, options: dict = None) -> None:
-    return await self._channel.send('newPage', dict(options=options))
+    self._child_frames: List[Frame] = []
+    for child_frame_guid in params.get('childFrameGuids'):
+      self._child_frames.append(channels[child_frame_guid].object)
+    self._channel.on('frameNavigated', lambda url: self._onFrameNavigated(url))
+    self._channel.on('frameAttached', lambda frame: self._child_frames.append(frame))
+    self._channel.on('frameDetached', lambda frame: self._child_frames.remove(frame))
 
-  async def close(self) -> None:
-    await self._channel.send('close')
+  @property
+  def name(self) -> str:
+    return self._name
+
+  @property
+  def url(self) -> str:
+    return self._url
+
+  @property
+  def parentFrame(self) -> Optional['Frame']:
+    return self._parent_frame
+
+  @property
+  def childFrames(self) -> List['Frame']:
+    return list(self._child_frames)
+
+  @property
+  def isDetached(self) -> bool:
+    return self._is_detached
+
+  def _onFrameNavigated(self, url: str) -> None:
+    self._url = url
+    self._page.emit(Page.Events.FrameNavigated, self)
 
 
-class BrowserType:
+class ElementHandle(ChannelOwner):
+
   def __init__(self, channel: Channel) -> None:
-    self._channel = channel
+    super().__init__(channel)
 
-  async def launch(self, options: dict = None) -> Browser:
-    return await self._channel.send('launch', dict(options=options))
+  def _initialize(self, params: Dict, channels: Dict[int, Channel]) -> None: 
+    self._frame = channels[params.get('frameGuid')].object
+
+  async def click(self, options: dict = None) -> None:
+    await self._channel.send('click', dict(options=options))
+
+  async def textContent(self) -> str: 
+    return await self._channel.send('textContent')
+
 
 class Playwright:
   async def init(self) -> None:
@@ -222,50 +315,69 @@ class Playwright:
       stdout=asyncio.subprocess.PIPE,
       stderr=asyncio.subprocess.PIPE)
     self._connection = Connection(self._proc.stdout, self._proc.stdin, self.loop)
-    self.chromium = self._connection.create_remote_object('browserType', 'chromium', dict())
-    self.firefox = self._connection.create_remote_object('browserType', 'firefox', dict())
-    self.webkit = self._connection.create_remote_object('browserType', 'webkit', dict())
+    self.chromium = self._connection.create_remote_object('browserType', 'chromium')
+    self.firefox = self._connection.create_remote_object('browserType', 'firefox')
+    self.webkit = self._connection.create_remote_object('browserType', 'webkit')
 
   async def dispose(self) -> None:
     self._proc.kill()
     await self._proc.wait()
 
 
-async def obtainPlaywright() -> Awaitable:
+async def obtain_playwright() -> Awaitable:
   playwright = Playwright()
   await playwright.init()
   return playwright
 
 
 async def run():
-    playwright = await obtainPlaywright()
+    playwright = await obtain_playwright()
+    print('Launching browser...')
     browser = await playwright.chromium.launch()
-    context = await browser.new_context(dict(viewport=None))
-    print('Pages: %d' % len(context.pages()))
+    print('Creating context...')
+    context = await browser.newContext(dict(viewport=None))
+    print('Pages in context: %d' % len(context.pages()))
 
-    page1 = await context.new_page()
+    print('\nCreating page1...')
+    page1 = await context.newPage()
+    page1.on(Page.Events.FrameNavigated, lambda frame: print('Frame navigated to %s' % frame.url))
+    print('Navigating page1 to https://example.com...')
     await page1.goto('https://example.com')
-    print(await page1.title())
-    print('Pages: %d' % len(context.pages()))
+    print('Page1 main frame url: %s' % page1.mainFrame.url)
+    print('Page1 tile: %s' % await page1.title())
+    print('Frames in page1: %d' % len(page1.frames))
+    print('Pages in context: %d' % len(context.pages()))
     # await page1.screenshot(dict(path='example.png'))
 
-    page2 = await context.new_page()
+    print('\nCreating page2...')
+    page2 = await context.newPage()
+    page2.on(Page.Events.FrameNavigated, lambda frame: print('Frame navigated to %s' % frame.url))
+    print('Navigating page2 to https://webkit.org...')
     await page2.goto('https://webkit.org')
-    print(await page2.title())
-    print('Pages: %d' % len(context.pages()))
+    print('Page2 tile: %s' % await page2.title())
+    print('Pages in context: %d' % len(context.pages()))
 
+    print('\nQuerying body...')
     body1 = await page1.querySelector('body')
-    print(await body1.textContent())
+    print('Body text %s' % await body1.textContent())
 
-    print('Closing page 1')
+    print('Closing page1...')
     await page1.close()
-    print('Pages: %d' % len(context.pages()))
+    print('Pages in context: %d' % len(context.pages()))
+
+    print('Navigating page2 to https://cnn.com...')
+    await page2.goto('https://cnn.com')
+    print('Page2 main frame url: %s' % page2.mainFrame.url)
+    print('Page2 tile: %s' % await page2.title())
+    print('Frames in page2: %d' % len(page2.frames))
+    print('Pages in context: %d' % len(context.pages()))
 
     print('Contexts: %d' % len(browser.contexts()))
-    print('Closing context')
+    print('Closing context...')
     await context.close()
     print('Contexts: %d' % len(browser.contexts()))
 
+    print('Closing browser')
     await browser.close()
     await playwright.dispose()
 
