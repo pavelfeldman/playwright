@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-import { ConsoleMessage } from '../../console';
 import { Events } from '../../events';
-import { Request, Response } from '../../network';
+import { Request } from '../../network';
 import { Frame } from '../../frames';
 import { Page } from '../../page';
 import * as types from '../../types';
@@ -27,6 +26,7 @@ import { FrameDispatcher } from './frameDispatcher';
 import { RequestDispatcher, ResponseDispatcher, RouteDispatcher } from './networkDispatchers';
 import { ConsoleMessageDispatcher } from './consoleMessageDispatcher';
 import { BrowserContext } from '../../browserContext';
+import { serializeError, parseError } from '../../helper';
 
 export class PageDispatcher extends Dispatcher implements PageChannel {
   private _page: Page;
@@ -51,20 +51,19 @@ export class PageDispatcher extends Dispatcher implements PageChannel {
       frames: page.frames().map(f => FrameDispatcher.from(this._scope, f)),
     });
     this._page = page;
+    page.on(Events.Page.Close, () => this._dispatchEvent('close'));
+    page.on(Events.Page.Console, message => this._dispatchEvent('console', ConsoleMessageDispatcher.from(this._scope, message)));
     page.on(Events.Page.FrameAttached, frame => this._onFrameAttached(frame));
     page.on(Events.Page.FrameDetached, frame => this._onFrameDetached(frame));
     page.on(Events.Page.FrameNavigated, frame => this._onFrameNavigated(frame));
-    page.on(Events.Page.Close, () => {
-      this._dispatchEvent('close');
-    });
+    page.on(Events.Page.PageError, error => this._dispatchEvent('pageError', { error: serializeError(error) }));
     page.on(Events.Page.Request, request => this._dispatchEvent('request', RequestDispatcher.from(this._scope, request)));
-    page.on(Events.Page.Response, response => this._dispatchEvent('response', ResponseDispatcher.from(this._scope, response)));
-    page.on(Events.Page.RequestFinished, request => this._dispatchEvent('requestFinished', RequestDispatcher.from(this._scope, request)));
     page.on(Events.Page.RequestFailed, (request: Request) => this._dispatchEvent('requestFailed', {
       request: RequestDispatcher.from(this._scope, request),
       failureText: request._failureText
     }));
-    page.on(Events.Page.Console, message => this._dispatchEvent('console', ConsoleMessageDispatcher.from(this._scope, message)));
+    page.on(Events.Page.RequestFinished, request => this._dispatchEvent('requestFinished', RequestDispatcher.from(this._scope, request)));
+    page.on(Events.Page.Response, response => this._dispatchEvent('response', ResponseDispatcher.from(this._scope, response)));
   }
 
   async setDefaultNavigationTimeoutNoReply(params: { timeout: number }) {
@@ -93,21 +92,6 @@ export class PageDispatcher extends Dispatcher implements PageChannel {
 
   async reload(params: { options?: types.NavigateOptions }): Promise<ResponseChannel | null> {
     return ResponseDispatcher.fromNullable(this._scope, await this._page.reload(params.options));
-  }
-
-  async waitForEvent(params: { event: string }): Promise<any> {
-    const result = await this._page.waitForEvent(params.event);
-    if (result instanceof ConsoleMessage)
-      return ConsoleMessageDispatcher.from(this._scope, result);
-    if (result instanceof Request)
-      return RequestDispatcher.from(this._scope, result);
-    if (result instanceof Response)
-      return ResponseDispatcher.from(this._scope, result);
-    if (result instanceof Frame)
-      return FrameDispatcher.from(this._scope, result);
-    if (result instanceof Page)
-      return PageDispatcher.from(this._scope, result);
-    return result;
   }
 
   async goBack(params: { options?: types.NavigateOptions }): Promise<ResponseChannel | null> {
@@ -240,13 +224,7 @@ export class BindingCallDispatcher extends Dispatcher implements BindingCallChan
     this._resolve!(params.result);
   }
 
-  reject(params: { message?: string, stack?: string, value?: any }) {
-    if (params.message !== undefined) {
-      const error = new Error(params.message);
-      error.stack = params.stack;
-      this._reject!(error);
-      return;
-    }
-    this._reject!(params.value);
+  reject(params: { error: types.Error }) {
+    this._reject!(parseError(params.error));
   }
 }

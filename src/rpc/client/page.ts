@@ -17,9 +17,9 @@
 
 import { EventEmitter } from 'events';
 import { Events } from '../../events';
-import { assert, assertMaxArguments, helper, Listener } from '../../helper';
+import { assert, assertMaxArguments, helper, Listener, serializeError, parseError } from '../../helper';
 import * as types from '../../types';
-import { BrowserContextChannel, FrameChannel, PageChannel, BindingCallChannel } from '../channels';
+import { BrowserContextChannel, FrameChannel, PageChannel, BindingCallChannel, Channel } from '../channels';
 import { BrowserContext } from './browserContext';
 import { ChannelOwner } from './channelOwner';
 import { ElementHandle } from './elementHandle';
@@ -68,17 +68,18 @@ export class Page extends ChannelOwner<PageChannel> {
     this._frames.add(this._mainFrame);
     this._viewportSize = payload.viewportSize;
 
+    this._channel.on('bindingCall', bindingCall => this._onBinding(BindingCall.from(bindingCall)));
+    this._channel.on('close', () => this._onClose());
+    this._channel.on('console', message => this.emit(Events.Page.Console, ConsoleMessage.from(message)));
     this._channel.on('frameAttached', frame => this._onFrameAttached(Frame.from(frame)));
     this._channel.on('frameDetached', frame => this._onFrameDetached(Frame.from(frame)));
     this._channel.on('frameNavigated', ({ frame, url, name }) => this._onFrameNavigated(Frame.from(frame), url, name));
+    this._channel.on('pageError', ({ error }) => this.emit(Events.Page.PageError, parseError(error)));
     this._channel.on('request', request => this.emit(Events.Page.Request, Request.from(request)));
-    this._channel.on('response', response => this.emit(Events.Page.Response, Response.from(response)));
-    this._channel.on('requestFinished', request => this.emit(Events.Page.RequestFinished, Request.from(request)));
     this._channel.on('requestFailed', ({ request, failureText }) => this._onRequestFailed(Request.from(request), failureText));
+    this._channel.on('requestFinished', request => this.emit(Events.Page.RequestFinished, Request.from(request)));
+    this._channel.on('response', response => this.emit(Events.Page.Response, Response.from(response)));
     this._channel.on('route', ({ route, request }) => this._onRoute(Route.from(route), Request.from(request)));
-    this._channel.on('bindingCall', bindingCall => this._onBinding(BindingCall.from(bindingCall)));
-    this._channel.on('console', message => this.emit(Events.Page.Console, ConsoleMessage.from(message)));
-    this._channel.on('close', () => this._onClose());
   }
 
   private _onRequestFailed(request: Request, failureText: string | null) {
@@ -272,9 +273,7 @@ export class Page extends ChannelOwner<PageChannel> {
   }
 
   async waitForEvent(event: string, optionsOrPredicate: types.WaitForEventOptions = {}): Promise<any> {
-    const result = await this._channel.waitForEvent({ event });
-    if (result._object)
-      return result._object;
+    return waitForEvent(this, event, optionsOrPredicate);
   }
 
   async goBack(options?: types.NavigateOptions): Promise<Response | null> {
@@ -482,10 +481,27 @@ export class BindingCall extends ChannelOwner<BindingCallChannel> {
     try {
       this._channel.resolve({ result: await func(this.source!, ...this.args) });
     } catch (e) {
-      if (e instanceof Error)
-        this._channel.reject({ message: e.message, stack: e.stack });
-      else
-        this._channel.reject({ value: e});
+      this._channel.reject({ error: serializeError(e) });
     }
   }
+}
+
+export async function waitForEvent(emitter: EventEmitter, event: string, optionsOrPredicate: types.WaitForEventOptions = {}): Promise<any> {
+  // TODO: support timeout
+  let predicate: Function | undefined;
+  if (typeof optionsOrPredicate === 'function')
+    predicate = optionsOrPredicate;
+  else if (optionsOrPredicate.predicate)
+    predicate = optionsOrPredicate.predicate;
+  let callback: (a: any) => void;
+  const result = new Promise(f => callback = f);
+  const listener = helper.addEventListener(emitter, event, param => {
+    // TODO: do not detect channel by guid.
+    const object = param._guid ? (param as Channel)._object : param;
+    if (predicate && !predicate(object))
+      return;
+    callback(object);
+    helper.removeEventListeners([listener]);
+  });
+  return result;
 }

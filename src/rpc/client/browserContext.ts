@@ -16,7 +16,7 @@
  */
 
 import * as frames from './frame';
-import { Page, BindingCall } from './page';
+import { Page, BindingCall, waitForEvent } from './page';
 import * as types from '../../types';
 import * as network from './network';
 import { BrowserContextChannel } from '../channels';
@@ -44,8 +44,8 @@ export class BrowserContext extends ChannelOwner<BrowserContextChannel> {
   }
 
   _initialize() {
-    this._channel.on('route', ({ route, request }) => this._onRoute(network.Route.from(route), network.Request.from(request)));
     this._channel.on('bindingCall', bindingCall => this._onBinding(BindingCall.from(bindingCall)));
+    this._channel.on('route', ({ route, request }) => this._onRoute(network.Route.from(route), network.Request.from(request)));
   }
 
   private _onRoute(route: network.Route, request: network.Request) {
@@ -154,7 +154,7 @@ export class BrowserContext extends ChannelOwner<BrowserContextChannel> {
   }
 
   async waitForEvent(event: string, optionsOrPredicate?: Function | (types.TimeoutOptions & { predicate?: Function })): Promise<any> {
-    return await this._channel.waitForEvent({ event });
+    return waitForEvent(this, event, optionsOrPredicate);
   }
 
   async close(): Promise<void> {
