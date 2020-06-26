@@ -19,13 +19,13 @@ import { EventEmitter } from 'events';
 import { Events } from '../../events';
 import { assert, assertMaxArguments, helper, Listener } from '../../helper';
 import * as types from '../../types';
-import { BrowserContextChannel, FrameChannel, PageChannel } from '../channels';
+import { BrowserContextChannel, FrameChannel, PageChannel, BindingCallChannel } from '../channels';
 import { BrowserContext } from './browserContext';
 import { ChannelOwner } from './channelOwner';
 import { ElementHandle } from './elementHandle';
 import { Frame, FunctionWithSource, GotoOptions } from './frame';
 import { Func1, FuncOn, SmartHandle } from './jsHandle';
-import { Request, Response, RouteHandler } from './network';
+import { Request, Response, RouteHandler, Route } from './network';
 import { Connection } from '../connection';
 import { Keyboard, Mouse } from './input';
 import { Accessibility } from './accessibility';
@@ -45,6 +45,7 @@ export class Page extends ChannelOwner<PageChannel> {
   readonly accessibility: Accessibility;
   readonly keyboard: Keyboard;
   readonly mouse: Mouse;
+  readonly _bindings = new Map<string, FunctionWithSource>();
 
   static from(page: PageChannel): Page {
     return page._object;
@@ -69,13 +70,20 @@ export class Page extends ChannelOwner<PageChannel> {
 
     this._channel.on('frameAttached', frame => this._onFrameAttached(Frame.from(frame)));
     this._channel.on('frameDetached', frame => this._onFrameDetached(Frame.from(frame)));
-    this._channel.on('frameNavigated', ({ frame, url }) => this._onFrameNavigated(Frame.from(frame), url));
+    this._channel.on('frameNavigated', ({ frame, url, name }) => this._onFrameNavigated(Frame.from(frame), url, name));
     this._channel.on('request', request => this.emit(Events.Page.Request, Request.from(request)));
     this._channel.on('response', response => this.emit(Events.Page.Response, Response.from(response)));
-    this._channel.on('requestFinished', request => this.emit(Events.Page.Request, Request.from(request)));
-    this._channel.on('requestFailed', request => this.emit(Events.Page.Request, Request.from(request)));
+    this._channel.on('requestFinished', request => this.emit(Events.Page.RequestFinished, Request.from(request)));
+    this._channel.on('requestFailed', ({ request, failureText }) => this._onRequestFailed(Request.from(request), failureText));
+    this._channel.on('route', ({ route, request }) => this._onRoute(Route.from(route), Request.from(request)));
+    this._channel.on('bindingCall', bindingCall => this._onBinding(BindingCall.from(bindingCall)));
     this._channel.on('console', message => this.emit(Events.Page.Console, ConsoleMessage.from(message)));
     this._channel.on('close', () => this._onClose());
+  }
+
+  private _onRequestFailed(request: Request, failureText: string | null) {
+    request._failureText = failureText;
+    this.emit(Events.Page.RequestFailed,  request);
   }
 
   private _onFrameAttached(frame: Frame) {
@@ -92,9 +100,27 @@ export class Page extends ChannelOwner<PageChannel> {
     this.emit(Events.Page.FrameDetached, frame);
   }
 
-  private _onFrameNavigated(frame: Frame, url: string) {
+  private _onFrameNavigated(frame: Frame, url: string, name: string) {
     frame._url = url;
+    frame._name = name;
     this.emit(Events.Page.FrameNavigated, frame);
+  }
+
+  private _onRoute(route: Route, request: Request) {
+    for (const {url, handler} of this._routes) {
+      if (helper.urlMatches(request.url(), url)) {
+        handler(route, request);
+        return;
+      }
+    }
+    route.continue();
+  }
+
+  async _onBinding(bindingCall: BindingCall) {
+    const func = this._bindings.get(bindingCall.name);
+    if (!func)
+      return;
+    bindingCall.call(func);
   }
 
   private _onClose() {
@@ -111,7 +137,7 @@ export class Page extends ChannelOwner<PageChannel> {
   }
 
   mainFrame(): Frame {
-    return this._mainFrame!!;
+    return this._mainFrame!;
   }
 
   frame(options: string | { name?: string, url?: types.URLMatch }): Frame | null {
@@ -186,7 +212,12 @@ export class Page extends ChannelOwner<PageChannel> {
     await this.exposeBinding(name, (options, ...args: any) => playwrightFunction(...args));
   }
 
-  async exposeBinding(name: string, playwrightBinding: FunctionWithSource) {
+  async exposeBinding(name: string, binding: FunctionWithSource) {
+    if (this._bindings.has(name))
+      throw new Error(`Function "${name}" has been already registered`);
+    if (this._browserContext!._bindings.has(name))
+      throw new Error(`Function "${name}" has been already registered in the browser context`);
+    this._bindings.set(name, binding);
     await this._channel.exposeBinding({ name });
   }
 
@@ -422,5 +453,39 @@ export class Worker extends EventEmitter {
   async evaluateHandle<R, Arg>(pageFunction: Func1<Arg, R>, arg: Arg): Promise<SmartHandle<R>> {
     assertMaxArguments(arguments.length, 2);
     return await this._channel.evaluateHandle({ pageFunction, arg });
+  }
+}
+
+export class BindingCall extends ChannelOwner<BindingCallChannel> {
+  name: string = '';
+  source: { context: BrowserContext, page: Page, frame: Frame } | undefined;
+  args: any[] = [];
+  static from(channel: BindingCallChannel): BindingCall {
+    return channel._object;
+  }
+
+  constructor(connection: Connection, channel: BindingCallChannel) {
+    super(connection, channel);
+  }
+
+  _initialize(params: { name: string, context: BrowserContextChannel, page: PageChannel, frame: FrameChannel, args: any[] }) {
+    this.name = params.name;
+    this.source = {
+      context: BrowserContext.from(params.context),
+      page: Page.from(params.page),
+      frame: Frame.from(params.frame)
+    };
+    this.args = params.args;
+  }
+
+  async call(func: FunctionWithSource) {
+    try {
+      this._channel.resolve({ result: await func(this.source!, ...this.args) });
+    } catch (e) {
+      if (e instanceof Error)
+        this._channel.reject({ message: e.message, stack: e.stack });
+      else
+        this._channel.reject({ value: e});
+    }
   }
 }

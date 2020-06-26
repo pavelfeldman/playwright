@@ -16,15 +16,17 @@
 
 import { ConsoleMessage } from '../../console';
 import { Events } from '../../events';
+import { Request, Response } from '../../network';
 import { Frame } from '../../frames';
 import { Page } from '../../page';
 import * as types from '../../types';
-import { ElementHandleChannel, PageChannel, ResponseChannel } from '../channels';
+import { ElementHandleChannel, PageChannel, ResponseChannel, BindingCallChannel } from '../channels';
 import { Dispatcher, DispatcherScope } from '../dispatcher';
 import { BrowserContextDispatcher } from './browserContextDispatcher';
 import { FrameDispatcher } from './frameDispatcher';
-import { RequestDispatcher, ResponseDispatcher } from './networkDispatchers';
+import { RequestDispatcher, ResponseDispatcher, RouteDispatcher } from './networkDispatchers';
 import { ConsoleMessageDispatcher } from './consoleMessageDispatcher';
+import { BrowserContext } from '../../browserContext';
 
 export class PageDispatcher extends Dispatcher implements PageChannel {
   private _page: Page;
@@ -57,8 +59,11 @@ export class PageDispatcher extends Dispatcher implements PageChannel {
     });
     page.on(Events.Page.Request, request => this._dispatchEvent('request', RequestDispatcher.from(this._scope, request)));
     page.on(Events.Page.Response, response => this._dispatchEvent('response', ResponseDispatcher.from(this._scope, response)));
-    page.on(Events.Page.RequestFinished, request => this._dispatchEvent('requestFinished', ResponseDispatcher.from(this._scope, request)));
-    page.on(Events.Page.RequestFailed, request => this._dispatchEvent('requestFailed', ResponseDispatcher.from(this._scope, request)));
+    page.on(Events.Page.RequestFinished, request => this._dispatchEvent('requestFinished', RequestDispatcher.from(this._scope, request)));
+    page.on(Events.Page.RequestFailed, (request: Request) => this._dispatchEvent('requestFailed', {
+      request: RequestDispatcher.from(this._scope, request),
+      failureText: request._failureText
+    }));
     page.on(Events.Page.Console, message => this._dispatchEvent('console', ConsoleMessageDispatcher.from(this._scope, message)));
   }
 
@@ -75,6 +80,11 @@ export class PageDispatcher extends Dispatcher implements PageChannel {
   }
 
   async exposeBinding(params: { name: string }): Promise<void> {
+    this._page.exposeBinding(params.name, (source, ...args) => {
+      const bindingCall = new BindingCallDispatcher(this._scope, params.name, source, args);
+      this._dispatchEvent('bindingCall', bindingCall);
+      return bindingCall.promise();
+    });
   }
 
   async setExtraHTTPHeaders(params: { headers: types.Headers }): Promise<void> {
@@ -89,6 +99,15 @@ export class PageDispatcher extends Dispatcher implements PageChannel {
     const result = await this._page.waitForEvent(params.event);
     if (result instanceof ConsoleMessage)
       return ConsoleMessageDispatcher.from(this._scope, result);
+    if (result instanceof Request)
+      return RequestDispatcher.from(this._scope, result);
+    if (result instanceof Response)
+      return ResponseDispatcher.from(this._scope, result);
+    if (result instanceof Frame)
+      return FrameDispatcher.from(this._scope, result);
+    if (result instanceof Page)
+      return PageDispatcher.from(this._scope, result);
+    return result;
   }
 
   async goBack(params: { options?: types.NavigateOptions }): Promise<ResponseChannel | null> {
@@ -112,6 +131,13 @@ export class PageDispatcher extends Dispatcher implements PageChannel {
   }
 
   async setNetworkInterceptionEnabled(params: { enabled: boolean }): Promise<void> {
+    if (!params.enabled) {
+      await this._page.unroute('**/*');
+      return;
+    }
+    this._page.route('**/*', (route, request) => {
+      this._dispatchEvent('route', { route: RouteDispatcher.from(this._scope, route), request: RequestDispatcher.from(this._scope, request) });
+    });
   }
 
   async screenshot(params: { options?: types.ScreenshotOptions }): Promise<Buffer> {
@@ -177,10 +203,50 @@ export class PageDispatcher extends Dispatcher implements PageChannel {
   }
 
   _onFrameNavigated(frame: Frame) {
-    this._dispatchEvent('frameNavigated', { frame: FrameDispatcher.from(this._scope, frame), url: frame.url() });
+    this._dispatchEvent('frameNavigated', { frame: FrameDispatcher.from(this._scope, frame), url: frame.url(), name: frame.name() });
   }
 
   _onFrameDetached(frame: Frame) {
     this._dispatchEvent('frameDetached', FrameDispatcher.from(this._scope, frame));
+  }
+}
+
+
+export class BindingCallDispatcher extends Dispatcher implements BindingCallChannel {
+  private _resolve: ((arg: any) => void) | undefined;
+  private _reject: ((error: any) => void) | undefined;
+  private _promise: Promise<any>;
+
+  constructor(scope: DispatcherScope, name: string, source: { context: BrowserContext, page: Page, frame: Frame }, args: any[]) {
+    super(scope, {}, 'bindingCall');
+    this._initialize({
+      name,
+      context: BrowserContextDispatcher.from(scope, source.context),
+      page: PageDispatcher.from(scope, source.page),
+      frame: FrameDispatcher.from(scope, source.frame),
+      args
+    });
+    this._promise = new Promise((resolve, reject) => {
+      this._resolve = resolve;
+      this._reject = reject;
+    });
+  }
+
+  promise() {
+    return this._promise;
+  }
+
+  resolve(params: { result: any }) {
+    this._resolve!(params.result);
+  }
+
+  reject(params: { message?: string, stack?: string, value?: any }) {
+    if (params.message !== undefined) {
+      const error = new Error(params.message);
+      error.stack = params.stack;
+      this._reject!(error);
+      return;
+    }
+    this._reject!(params.value);
   }
 }

@@ -58,13 +58,15 @@ export interface BrowserContextChannel extends Channel {
 export interface PageChannel extends Channel {
   on(event: 'frameAttached', callback: (params: FrameChannel) => void): this;
   on(event: 'frameDetached', callback: (params: FrameChannel) => void): this;
-  on(event: 'frameNavigated', callback: (params: { frame: FrameChannel, url: string }) => void): this;
+  on(event: 'frameNavigated', callback: (params: { frame: FrameChannel, url: string, name: string }) => void): this;
   on(event: 'request', callback: (params: RequestChannel) => void): this;
   on(event: 'response', callback: (params: ResponseChannel) => void): this;
   on(event: 'requestFinished', callback: (params: RequestChannel) => void): this;
-  on(event: 'requestFailed', callback: (params: RequestChannel) => void): this;
+  on(event: 'requestFailed', callback: (params: { request: RequestChannel, failureText: string | null }) => void): this;
+  on(event: 'route', callback: (params: { route: RouteChannel, request: RequestChannel }) => void): this;
   on(event: 'close', callback: () => void): this;
   on(event: 'console', callback: (params: ConsoleMessageChannel) => void): this;
+  on(event: 'bindingCall', callback: (params: BindingCallChannel) => void): this;
 
   setDefaultNavigationTimeoutNoReply(params: { timeout: number }): void;
   setDefaultTimeoutNoReply(params: { timeout: number }): Promise<void>;
@@ -177,10 +179,13 @@ export interface ElementHandleChannel extends JSHandleChannel {
 }
 
 export interface RequestChannel extends Channel {
+  response(): Promise<ResponseChannel | null>;
+}
+
+export interface RouteChannel extends Channel {
   continue(params: { overrides: { method?: string, headers?: types.Headers, postData?: string } }): Promise<void>;
   fulfill(params: { response: types.FulfillResponse & { path?: string } }): Promise<void>;
   abort(params: { errorCode: string }): Promise<void>;
-  response(): Promise<ResponseChannel | null>;
 }
 
 export interface ResponseChannel extends Channel {
@@ -189,4 +194,9 @@ export interface ResponseChannel extends Channel {
 }
 
 export interface ConsoleMessageChannel extends Channel {
+}
+
+export interface BindingCallChannel extends Channel {
+  resolve(params: { result: any }): void;
+  reject(params: { message?: string, stack?: string, value?: any }): void;
 }

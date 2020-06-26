@@ -16,7 +16,7 @@
  */
 
 import * as frames from './frame';
-import { Page } from './page';
+import { Page, BindingCall } from './page';
 import * as types from '../../types';
 import * as network from './network';
 import { BrowserContextChannel } from '../channels';
@@ -29,6 +29,7 @@ export class BrowserContext extends ChannelOwner<BrowserContextChannel> {
   _pages = new Set<Page>();
   private _routes: { url: types.URLMatch, handler: network.RouteHandler }[] = [];
   _browser: Browser | undefined;
+  readonly _bindings = new Map<string, frames.FunctionWithSource>();
 
   static from(context: BrowserContextChannel): BrowserContext {
     return context._object;
@@ -43,6 +44,25 @@ export class BrowserContext extends ChannelOwner<BrowserContextChannel> {
   }
 
   _initialize() {
+    this._channel.on('route', ({ route, request }) => this._onRoute(network.Route.from(route), network.Request.from(request)));
+    this._channel.on('bindingCall', bindingCall => this._onBinding(BindingCall.from(bindingCall)));
+  }
+
+  private _onRoute(route: network.Route, request: network.Request) {
+    for (const {url, handler} of this._routes) {
+      if (helper.urlMatches(request.url(), url)) {
+        handler(route, request);
+        return;
+      }
+    }
+    route.continue();
+  }
+
+  async _onBinding(bindingCall: BindingCall) {
+    const func = this._bindings.get(bindingCall.name);
+    if (!func)
+      return;
+    bindingCall.call(func);
   }
 
   setDefaultNavigationTimeout(timeout: number) {
@@ -106,7 +126,15 @@ export class BrowserContext extends ChannelOwner<BrowserContextChannel> {
     await this._channel.addInitScript({ source });
   }
 
-  async exposeBinding(name: string, playwrightBinding: frames.FunctionWithSource): Promise<void> {
+  async exposeBinding(name: string, binding: frames.FunctionWithSource): Promise<void> {
+    for (const page of this.pages()) {
+      if (page._bindings.has(name))
+        throw new Error(`Function "${name}" has been already registered in one of the pages`);
+    }
+    if (this._bindings.has(name))
+      throw new Error(`Function "${name}" has been already registered`);
+    this._bindings.set(name, binding);
+    await this._channel.exposeBinding({ name });
   }
 
   async exposeFunction(name: string, playwrightFunction: Function): Promise<void> {
