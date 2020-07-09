@@ -15,6 +15,7 @@
  */
 
 import * as dom from './dom';
+import * as util from 'util';
 import * as utilityScriptSource from './generated/utilityScriptSource';
 import * as sourceMap from './utils/sourceMap';
 import { serializeAsCallArgument } from './common/utilityScriptSerializers';
@@ -146,6 +147,10 @@ export class JSHandle<T = any> {
   }
 
   toString(): string {
+    return this._preview;
+  }
+
+  [util.inspect.custom]() {
     return this._preview;
   }
 
