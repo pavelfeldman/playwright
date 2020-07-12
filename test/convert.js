@@ -1,7 +1,7 @@
 const fs = require('fs');
 
 (async () => {
-  const content = fs.readFileSync('/Users/pfeldman/code/playwright/test/click.spec.js').toString();
+  const content = fs.readFileSync('/Users/pfeldman/code/playwright/test/page.spec.js').toString();
   const lines = content.split('\n');
   for (let line of lines) {
     if (line.trim().startsWith('describe')) {
