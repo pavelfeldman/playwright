@@ -154,8 +154,8 @@ export interface PageChannel extends Channel {
   on(event: 'console', callback: (params: { message: ConsoleMessageChannel }) => void): this;
   on(event: 'crash', callback: () => void): this;
   on(event: 'dialog', callback: (params: { dialog: DialogChannel }) => void): this;
-  on(event: 'download', callback: (params: { download: DownloadChannel }) => void): this;
   on(event: 'domcontentloaded', callback: () => void): this;
+  on(event: 'download', callback: (params: { download: DownloadChannel }) => void): this;
   on(event: 'fileChooser', callback: (params: { element: ElementHandleChannel, isMultiple: boolean }) => void): this;
   on(event: 'frameAttached', callback: (params: { frame: FrameChannel }) => void): this;
   on(event: 'frameDetached', callback: (params: { frame: FrameChannel }) => void): this;
