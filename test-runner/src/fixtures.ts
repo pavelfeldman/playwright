@@ -155,20 +155,23 @@ export class FixturePool {
   async runTestWithFixtures(fn: Function, timeout: number, info: TestInfo) {
     let timer: NodeJS.Timer;
     const timerPromise = new Promise(f => timer = setTimeout(f, timeout));
-    await Promise.race([
-      this.resolveParametersAndRun(fn, info.config, info).then(() => {
-        info.result.status = 'passed';
-        clearTimeout(timer);
-        return this.teardownScope('test');
-      }).catch(e => {
-        // Don't tear down on exception - worker will be restarted and worker scope will clear test as well.
-        info.result.status = 'failed';
-        info.result.error = serializeError(e);
-      }),
-      timerPromise.then(() => {
-        info.result.status = 'timedOut';
-      })
-    ]);
+    try {
+      await Promise.race([
+        this.resolveParametersAndRun(fn, info.config, info).then(() => {
+          info.result.status = 'passed';
+          clearTimeout(timer);
+        }).catch(e => {
+          // Don't tear down on exception - worker will be restarted and worker scope will clear test as well.
+          info.result.status = 'failed';
+          info.result.error = serializeError(e);
+        }),
+        timerPromise.then(() => {
+          info.result.status = 'timedOut';
+        })
+      ]);
+    } finally {
+      await this.teardownScope('test');
+    }
   }
 }
 
