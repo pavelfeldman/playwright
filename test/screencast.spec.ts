@@ -218,7 +218,6 @@ describe('screencast', suite => {
   });
 
   it('should capture css transformation', (test, { browserName, platform, headful }) => {
-    test.fail(browserName === 'webkit' && platform === 'win32', 'Does not work on WebKit Windows');
     test.fixme(headful, 'Fails on headful');
   }, async ({browser, server, testRelativeArtifactsPath, testOutputPath}) => {
     const size = { width: 320, height: 240 };
