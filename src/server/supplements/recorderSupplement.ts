@@ -325,14 +325,19 @@ export class RecorderSupplement {
       await this.pause();
   }
 
-  async onAfterCall(sdkObject: SdkObject, metadata: CallMetadata): Promise<void> {
+  async onAfterCall(): Promise<void> {
     this._sdkObject = null;
     this._callMetadata = null;
+    this._recorderApp?.onCallLog([]);
   }
 
-  async onBeforeInputAction(sdkObject: SdkObject, metadata: CallMetadata): Promise<void> {
+  async onBeforeInputAction(): Promise<void> {
     if (this._pauseOnNextStatement)
       await this.pause();
+  }
+
+  async onCallLog(metadata: CallMetadata): Promise<void> {
+    this._recorderApp?.onCallLog(metadata.log);
   }
 
   private _source(metadata: CallMetadata): { source: string, line: number | undefined } {

@@ -20,12 +20,14 @@ import { Toolbar } from '../components/toolbar';
 import { ToolbarButton } from '../components/toolbarButton';
 import { Source as SourceView } from '../components/source';
 import type { Mode, PauseDetails, Source } from '../../server/supplements/recorder/recorderTypes';
+import { SplitView } from '../components/splitView';
 
 declare global {
   interface Window {
     playwrightSetMode: (mode: Mode) => void;
     playwrightSetPaused: (details: PauseDetails | null) => void;
     playwrightSetSource: (source: Source) => void;
+    playwrightSetLog: (log: string[]) => void;
     dispatch(data: any): Promise<void>;
     playwrightSourceEchoForTest?: (text: string) => Promise<void>;
   }
@@ -38,40 +40,60 @@ export const Recorder: React.FC<RecorderProps> = ({
 }) => {
   const [source, setSource] = React.useState<Source>({ language: 'javascript', text: '' });
   const [paused, setPaused] = React.useState<PauseDetails | null>(null);
+  const [log, setLog] = React.useState<string[]>([]);
   const [mode, setMode] = React.useState<Mode>('none');
 
   window.playwrightSetMode = setMode;
   window.playwrightSetSource = setSource;
   window.playwrightSetPaused = setPaused;
+  window.playwrightSetLog = setLog;
   if (window.playwrightSourceEchoForTest)
     window.playwrightSourceEchoForTest(source.text).catch(e => {});
 
-  return <div className="recorder">
+  return <div className='recorder'>
     <Toolbar>
-      <ToolbarButton icon="record" title="Record" toggled={mode == 'recording'} onClick={() => {
+      <ToolbarButton icon='record' title='Record' toggled={mode == 'recording'} onClick={() => {
         window.dispatch({ event: 'setMode', params: { mode: mode === 'recording' ? 'none' : 'recording' }}).catch(() => { });
       }}></ToolbarButton>
-      <ToolbarButton icon="question" title="Inspect" toggled={mode == 'inspecting'} onClick={() => {
+      <ToolbarButton icon='question' title='Inspect' toggled={mode == 'inspecting'} onClick={() => {
         window.dispatch({ event: 'setMode', params: { mode: mode === 'inspecting' ? 'none' : 'inspecting' }}).catch(() => { });
       }}></ToolbarButton>
-      <ToolbarButton icon="files" title="Copy" disabled={!source.text} onClick={() => {
+      <ToolbarButton icon='files' title='Copy' disabled={!source.text} onClick={() => {
         copy(source.text);
       }}></ToolbarButton>
-      <ToolbarButton icon="debug-continue" title="Resume" disabled={!paused} onClick={() => {
+      <ToolbarButton icon='debug-continue' title='Resume' disabled={!paused} onClick={() => {
         window.dispatch({ event: 'resume' }).catch(() => {});
       }}></ToolbarButton>
-      <ToolbarButton icon="debug-pause" title="Pause" disabled={!!paused} onClick={() => {
+      <ToolbarButton icon='debug-pause' title='Pause' disabled={!!paused} onClick={() => {
         window.dispatch({ event: 'pause' }).catch(() => {});
       }}></ToolbarButton>
-      <ToolbarButton icon="debug-step-over" title="Step over" disabled={!paused} onClick={() => {
+      <ToolbarButton icon='debug-step-over' title='Step over' disabled={!paused} onClick={() => {
         window.dispatch({ event: 'step' }).catch(() => {});
       }}></ToolbarButton>
-      <div style={{flex: "auto"}}></div>
-      <ToolbarButton icon="clear-all" title="Clear" disabled={!source.text} onClick={() => {
+      <div style={{flex: 'auto'}}></div>
+      <ToolbarButton icon='clear-all' title='Clear' disabled={!source.text} onClick={() => {
         window.dispatch({ event: 'clear' }).catch(() => {});
       }}></ToolbarButton>
     </Toolbar>
-    <SourceView text={source.text} language={source.language} highlightedLine={source.highlightedLine} paused={!!paused}></SourceView>
+    <SplitView sidebarSize={200}>
+      <SourceView text={source.text} language={source.language} highlightedLine={source.highlightedLine} paused={!!paused}></SourceView>
+      <div className='vbox'>
+        <div className='recorder-log-header' style={{flex: 'none'}}>Action progress</div>
+        <div className='recorder-log' style={{flex: 'auto'}}>
+          {log.map(message => {
+            const isTopLevel = !message.startsWith(' ');
+            const isWaiting = message.startsWith('waiting');
+            const iconClass = isWaiting ? 'codicon codicon-clock' : 'codicon codicon-debug-stackframe';
+            message = message.trim();
+            const className = 'recorder-log-message ' + (isTopLevel ? 'recorder-log-message-top-level' : 'recorder-log-message-sub-level');
+            return <div className={className}>
+              { isTopLevel ? <span className={iconClass}></span> : undefined }
+              { message }
+            </div>;
+          })}
+        </div>
+      </div>
+    </SplitView>
   </div>;
 };
 
