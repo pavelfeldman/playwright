@@ -77,7 +77,7 @@ export const Recorder: React.FC<RecorderProps> = ({
       <ToolbarButton icon='debug-step-over' title='Step over' disabled={!paused} onClick={() => {
         window.dispatch({ event: 'step' }).catch(() => {});
       }}></ToolbarButton>
-      <select className='recorder-chooser' hidden={!sources.length} value={file} onChange={event => {
+      <select className='recorder-file-chooser' hidden={!sources.length} value={file} onChange={event => {
           setFile(event.target.selectedOptions[0].value);
         }}>{
           sources.map(s => {
@@ -87,14 +87,14 @@ export const Recorder: React.FC<RecorderProps> = ({
         }
       </select>
       <div style={{flex: 'auto'}}></div>
-      <ToolbarButton icon='clear-all' title='Clear' disabled={!source || !source.text} onClick={() => {
-        window.dispatch({ event: 'clear' }).catch(() => {});
-      }}></ToolbarButton>
     </Toolbar>
     <SplitView sidebarSize={200}>
       <SourceView text={source.text} language={source.language} highlight={source.highlight} revealLine={source.revealLine}></SourceView>
       <CallLogView log={[...log.values()]}/>
     </SplitView>
+    <ToolbarButton icon='clear-all' title='Clear' disabled={!source || !source.text} onClick={() => {
+        window.dispatch({ event: 'clear' }).catch(() => {});
+      }}></ToolbarButton>
   </div>;
 };
 

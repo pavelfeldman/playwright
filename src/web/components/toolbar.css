@@ -29,3 +29,21 @@
   display: block;
   flex: auto;
 }
+
+.toolbar input {
+  border: 1px solid #ddd;
+  padding: 0 10px;
+  border-radius: 14px;
+  line-height: 24px;
+  background: white;
+  outline: none;
+  margin-left: 10px;
+  color: var(--toolbar-color);
+}
+
+.toolbar select {
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--toolbar-color);
+}
