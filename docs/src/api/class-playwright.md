@@ -181,3 +181,8 @@ Selectors can be used to install custom selector engines. See
 - type: <[BrowserType]>
 
 This object can be used to launch or connect to WebKit, returning instances of [WebKitBrowser].
+
+## property: Playwright.webkitLegacy
+- type: <[BrowserType]>
+
+This object can be used to launch or connect to WebKit, returning instances of [WebKitBrowser].

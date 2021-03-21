@@ -26,6 +26,7 @@ import { Selectors, serverSelectors } from './selectors';
 import { HarTracer } from './supplements/har/harTracer';
 import { InspectorController } from './supplements/inspectorController';
 import { WebKit } from './webkit/webkit';
+import { WebKit as WebKitLegacy } from './webkit/webkit';
 import { Registry } from '../utils/registry';
 import { InstrumentationListener, multiplexInstrumentation, SdkObject } from './instrumentation';
 
@@ -36,6 +37,7 @@ export class Playwright extends SdkObject {
   readonly electron: Electron;
   readonly firefox: Firefox;
   readonly webkit: WebKit;
+  readonly webkitLegacy: WebKitLegacy;
   readonly options: PlaywrightOptions;
 
   constructor(isInternal: boolean) {
@@ -57,6 +59,7 @@ export class Playwright extends SdkObject {
     this.electron = new Electron(this.options);
     this.android = new Android(new AdbBackend(), this.options);
     this.selectors = serverSelectors;
+    this.webkitLegacy = new WebKitLegacy(this.options);
   }
 }
 

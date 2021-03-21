@@ -39,6 +39,7 @@ export class Playwright extends ChannelOwner<channels.PlaywrightChannel, channel
   readonly chromium: BrowserType;
   readonly firefox: BrowserType;
   readonly webkit: BrowserType;
+  readonly webkitLegacy: BrowserType;
   readonly devices: Devices;
   readonly selectors: Selectors;
   readonly errors: { TimeoutError: typeof TimeoutError };
@@ -48,6 +49,7 @@ export class Playwright extends ChannelOwner<channels.PlaywrightChannel, channel
     this.chromium = BrowserType.from(initializer.chromium);
     this.firefox = BrowserType.from(initializer.firefox);
     this.webkit = BrowserType.from(initializer.webkit);
+    this.webkitLegacy = BrowserType.from(initializer.webkit);
     this._android = Android.from(initializer.android);
     this._electron = Electron.from(initializer.electron);
     this.devices = {};

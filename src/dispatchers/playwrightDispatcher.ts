@@ -32,6 +32,7 @@ export class PlaywrightDispatcher extends Dispatcher<Playwright, channels.Playwr
       chromium: new BrowserTypeDispatcher(scope, playwright.chromium),
       firefox: new BrowserTypeDispatcher(scope, playwright.firefox),
       webkit: new BrowserTypeDispatcher(scope, playwright.webkit),
+      webkitLegacy: new BrowserTypeDispatcher(scope, playwright.webkitLegacy),
       android: new AndroidDispatcher(scope, playwright.android),
       electron: new ElectronDispatcher(scope, playwright.electron),
       deviceDescriptors,

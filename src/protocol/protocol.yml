@@ -230,6 +230,7 @@ Playwright:
     chromium: BrowserType
     firefox: BrowserType
     webkit: BrowserType
+    webkitLegacy: BrowserType
     android: Android
     electron: Electron
     deviceDescriptors:

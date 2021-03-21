@@ -156,6 +156,7 @@ export type PlaywrightInitializer = {
   chromium: BrowserTypeChannel,
   firefox: BrowserTypeChannel,
   webkit: BrowserTypeChannel,
+  webkitLegacy: BrowserTypeChannel,
   android: AndroidChannel,
   electron: ElectronChannel,
   deviceDescriptors: {
