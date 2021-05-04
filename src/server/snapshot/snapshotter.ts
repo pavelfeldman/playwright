@@ -125,7 +125,6 @@ export class Snapshotter {
         html: data.html,
         viewport: data.viewport,
         timestamp: monotonicTime(),
-        pageTimestamp: data.timestamp,
         collectionTime: data.collectionTime,
         resourceOverrides: [],
         isMainFrame: page.mainFrame() === frame

@@ -476,7 +476,6 @@ export class FFPage implements PageDelegate {
   }
 
   async setScreencastEnabled(enabled: boolean): Promise<void> {
-    throw new Error('Not implemented');
   }
 
   rafCountForStablePosition(): number {

@@ -180,7 +180,7 @@ it.describe('screencast', () => {
     expect(error.message).toContain('recordVideo.dir: expected string, got undefined');
   });
 
-  it('should capture static page', async ({browser}, testInfo) => {
+  it.only('should capture static page', async ({browser}, testInfo) => {
     const size = { width: 450, height: 240 };
     const context = await browser.newContext({
       recordVideo: {
