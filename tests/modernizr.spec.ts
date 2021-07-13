@@ -23,140 +23,64 @@ async function checkFeatures(name: string, context: any, server: any) {
     await page.goto(server.PREFIX + '/modernizr.html');
     const actual = await page.evaluate('window.report');
     const expected = JSON.parse(fs.readFileSync(require.resolve(`./assets/modernizr/${name}.json`), 'utf-8'));
-    expect(actual).toEqual(expected);
+    return { actual, expected };
   } finally {
     await context.close();
   }
 }
 
-it('safari-14-1', async ({ browser, browserName, platform, server }) => {
-  /* GTK
-   -   "gamepads": true,
-   +   "gamepads": false,
-   -   "getusermedia": true,
-   -   "hairline": true,
-   +   "getusermedia": false,
-   +   "hairline": false,
-   +   "hasEvent": undefined,
-
-       "input": Object {
-   -     "list": true,
-   +     "list": false,
-       },
-       "inputtypes": Object {
-   -     "color": true,
-   -     "date": true,
-   +     "color": false,
-   +     "date": false,
-   -     "datetime-local": true,
-   +     "datetime-local": false,
-   -     "time": true,
-   +     "time": false,
-       },
-   -   "peerconnection": true,
-   +   "peerconnection": false,
-   -   "pointerlock": true,
-   +   "pointerlock": false,
-   -   "speechrecognition": true,
-   -   "speechsynthesis": true,
-   +   "speechrecognition": false,
-   +   "speechsynthesis": false,
-   -   "subpixelfont": true,
-   +   "subpixelfont": false,
-   -   "todataurljpeg": true,
-   +   "todataurljpeg": false,
-   */
-
-  /* WPE
-   -   "datalistelem": true,
-   +   "datalistelem": false,
-   */
-
-  it.skip(browserName !== 'webkit' ||  platform !== 'darwin');
+it('safari-14-1', async ({ browser, browserName, platform, server, headless }) => {
+  it.skip(browserName !== 'webkit' ||  platform === 'win32');
   const context = await browser.newContext({
     deviceScaleFactor: 2
   });
-  await checkFeatures('safari-14-1', context, server);
+  let { actual, expected } = await checkFeatures('safari-14-1', context, server);
+
+  if (platform === 'linux') {
+    expected.subpixelfont = false;
+
+    if (headless) {
+      expected.inputtypes.color = false;
+      expected.inputtypes.date = false;
+      expected.inputtypes['datetime-local'] = false;
+      expected.inputtypes.time = false;
+      expected.todataurljpeg = false;
+    } else {
+      expected.inputtypes.month = true;
+      expected.inputtypes.week = true;
+    }
+  }
+
+  expect(actual).toEqual(expected);
 });
 
-it('mobile-safari-14-1', async ({ playwright, browser, browserName, platform, server }) => {
-  it.fixme();
-
-  /* macOS
-   -   "capture": true,
-   +   "capture": false,
-   -   "cssscrollbar": false,
-   +   "cssscrollbar": true,
-   -   "cssvhunit": false,
-   -   "cssvmaxunit": false,
-   +   "cssvhunit": true,
-   +   "cssvmaxunit": true,
-   -   "devicemotion": true,
-   -   "deviceorientation": true,
-   +   "devicemotion": false,
-   +   "deviceorientation": false,
-   -   "fullscreen": false,
-   +   "fullscreen": true,
-       "inputtypes": Object {
-   -     "month": true,
-   +     "month": false,
-   -     "week": true,
-   +     "week": false,
-       },
-   -   "notification": false,
-   +   "notification": true,
-   -   "overflowscrolling": true,
-   +   "overflowscrolling": false,
-   -   "pointerlock": false,
-   +   "pointerlock": true,
-   */
-
-  /* GTK
-   -   "datalistelem": true,
-   +   "datalistelem": false,
-   -   "gamepads": true,
-   +   "gamepads": false,
-   -   "getusermedia": true,
-   -   "hairline": true,
-   +   "getusermedia": false,
-   +   "hairline": false,
-   +   "hasEvent": undefined,
-
-       "input": Object {
-   -     "list": true,
-   +     "list": false,
-       },
-       "inputtypes": Object {
-   -     "color": true,
-   -     "date": true,
-   +     "color": false,
-   +     "date": false,
-   -     "datetime-local": true,
-   +     "datetime-local": false,
-   -     "time": true,
-   +     "time": false,
-       },
-   -   "peerconnection": true,
-   +   "peerconnection": false,
-   -   "pointerlock": true,
-   +   "pointerlock": false,
-   -   "speechrecognition": true,
-   -   "speechsynthesis": true,
-   +   "speechrecognition": false,
-   +   "speechsynthesis": false,
-   -   "subpixelfont": true,
-   +   "subpixelfont": false,
-   -   "todataurljpeg": true,
-   +   "todataurljpeg": false,
-   */
-
-  /* WPE
-   -   "datalistelem": true,
-   +   "datalistelem": false,
-   */
-
-  it.skip(browserName !== 'webkit' || platform !== 'darwin');
+it('mobile-safari-14-1', async ({ playwright, browser, browserName, platform, server, headless }) => {
+  it.skip(browserName !== 'webkit' || platform === 'win32');
   const iPhone = playwright.devices['iPhone 12'];
   const context = await browser.newContext(iPhone);
-  await checkFeatures('mobile-safari-14-1', context, server);
+  let { actual, expected } = await checkFeatures('mobile-safari-14-1', context, server);
+
+  if (platform === 'darwin' || platform === 'linux') {
+    expected.capture = false;
+    expected.cssscrollbar = true;
+    expected.cssvhunit = true;
+    expected.cssvmaxunit = true;
+    expected.overflowscrolling = false;
+  }
+
+  if (platform === 'linux') {
+    expected.subpixelfont = false;
+
+    if (headless) {
+      expected.inputtypes.color = false;
+      expected.inputtypes.date = false;
+      expected.inputtypes['datetime-local'] = false;
+      expected.inputtypes.month = false;
+      expected.inputtypes.week = false;
+      expected.inputtypes.time = false;
+      expected.todataurljpeg = false;
+    }
+  }
+
+  expect(actual).toEqual(expected);
 });
