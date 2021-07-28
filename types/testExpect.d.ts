@@ -36,6 +36,7 @@ type OverriddenExpectProperties =
 'toMatchInlineSnapshot' |
 'toThrowErrorMatchingInlineSnapshot' |
 'toMatchSnapshot' |
+'toHaveLength' |
 'toThrowErrorMatchingSnapshot';
 
 declare global {
@@ -143,7 +144,22 @@ declare global {
        * Asserts given DOM is a focused (active) in document.
        */
       toBeFocused(options?: { timeout?: number }): Promise<R>;
-      }
+
+      /**
+       * Asserts given select option is selected
+       */
+      toBeSelected(options?: { timeout?: number }): Promise<R>;
+
+      /**
+       * Asserts locator points to the given number of elements.
+       */
+      toHaveLength(length: number, options?: { timeout?: number }): Promise<R>;
+
+      /**
+       * Asserts JavaScript object that corresponds to the Node has a property with given value.
+       */
+      toHaveProp(name: string, value: any, options?: { timeout?: number }): Promise<R>;
+    }
   }
 }
 
