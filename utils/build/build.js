@@ -94,6 +94,7 @@ const webPackFiles = [
   'src/server/injected/webpack.config.js',
   'src/web/traceViewer/webpack.config.js',
   'src/web/recorder/webpack.config.js',
+  'src/web/report/webpack.config.js',
 ];
 for (const file of webPackFiles) {
   steps.push({
