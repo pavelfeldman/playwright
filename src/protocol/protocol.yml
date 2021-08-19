@@ -380,18 +380,42 @@ Playwright:
 
   commands:
 
-    setForwardedPorts:
+    setSocketLocalAddress:
       parameters:
-        ports:
-          type: array
-          items: number
+        uid: string
+        host: string
+        port: number
+
+    sendSocketData:
+      parameters:
+        uid: string
+        data: binary
+
+    sendSocketError:
+      parameters:
+        uid: string
+        code: string
+
+    sendSocketEnd:
+      parameters:
+        uid: string
 
   events:
-
-    incomingSocksSocket:
+    socketRequested:
       parameters:
-        socket: SocksSocket
+        uid: string
+        host: string
+        port: number
 
+    socketData:
+      parameters:
+        uid: string
+        data: binary
+
+    socketClosed:
+      parameters:
+        uid: string
+    
 
 Selectors:
   type: interface

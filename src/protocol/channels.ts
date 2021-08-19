@@ -196,19 +196,58 @@ export type PlaywrightInitializer = {
   preLaunchedBrowser?: BrowserChannel,
 };
 export interface PlaywrightChannel extends Channel {
-  on(event: 'incomingSocksSocket', callback: (params: PlaywrightIncomingSocksSocketEvent) => void): this;
-  setForwardedPorts(params: PlaywrightSetForwardedPortsParams, metadata?: Metadata): Promise<PlaywrightSetForwardedPortsResult>;
+  on(event: 'socketRequested', callback: (params: PlaywrightSocketRequestedEvent) => void): this;
+  on(event: 'socketData', callback: (params: PlaywrightSocketDataEvent) => void): this;
+  on(event: 'socketClosed', callback: (params: PlaywrightSocketClosedEvent) => void): this;
+  setSocketLocalAddress(params: PlaywrightSetSocketLocalAddressParams, metadata?: Metadata): Promise<PlaywrightSetSocketLocalAddressResult>;
+  sendSocketData(params: PlaywrightSendSocketDataParams, metadata?: Metadata): Promise<PlaywrightSendSocketDataResult>;
+  sendSocketError(params: PlaywrightSendSocketErrorParams, metadata?: Metadata): Promise<PlaywrightSendSocketErrorResult>;
+  sendSocketEnd(params: PlaywrightSendSocketEndParams, metadata?: Metadata): Promise<PlaywrightSendSocketEndResult>;
 }
-export type PlaywrightIncomingSocksSocketEvent = {
-  socket: SocksSocketChannel,
+export type PlaywrightSocketRequestedEvent = {
+  uid: string,
+  host: string,
+  port: number,
 };
-export type PlaywrightSetForwardedPortsParams = {
-  ports: number[],
+export type PlaywrightSocketDataEvent = {
+  uid: string,
+  data: Binary,
 };
-export type PlaywrightSetForwardedPortsOptions = {
+export type PlaywrightSocketClosedEvent = {
+  uid: string,
+};
+export type PlaywrightSetSocketLocalAddressParams = {
+  uid: string,
+  host: string,
+  port: number,
+};
+export type PlaywrightSetSocketLocalAddressOptions = {
 
 };
-export type PlaywrightSetForwardedPortsResult = void;
+export type PlaywrightSetSocketLocalAddressResult = void;
+export type PlaywrightSendSocketDataParams = {
+  uid: string,
+  data: Binary,
+};
+export type PlaywrightSendSocketDataOptions = {
+
+};
+export type PlaywrightSendSocketDataResult = void;
+export type PlaywrightSendSocketErrorParams = {
+  uid: string,
+  code: string,
+};
+export type PlaywrightSendSocketErrorOptions = {
+
+};
+export type PlaywrightSendSocketErrorResult = void;
+export type PlaywrightSendSocketEndParams = {
+  uid: string,
+};
+export type PlaywrightSendSocketEndOptions = {
+
+};
+export type PlaywrightSendSocketEndResult = void;
 
 // ----------- Selectors -----------
 export type SelectorsInitializer = {};

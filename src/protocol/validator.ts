@@ -152,8 +152,21 @@ export function createScheme(tChannel: (name: string) => Validator): Scheme {
   scheme.RootInitializeParams = tObject({
     language: tString,
   });
-  scheme.PlaywrightSetForwardedPortsParams = tObject({
-    ports: tArray(tNumber),
+  scheme.PlaywrightSetSocketLocalAddressParams = tObject({
+    uid: tString,
+    host: tString,
+    port: tNumber,
+  });
+  scheme.PlaywrightSendSocketDataParams = tObject({
+    uid: tString,
+    data: tBinary,
+  });
+  scheme.PlaywrightSendSocketErrorParams = tObject({
+    uid: tString,
+    code: tString,
+  });
+  scheme.PlaywrightSendSocketEndParams = tObject({
+    uid: tString,
   });
   scheme.SelectorsRegisterParams = tObject({
     name: tString,

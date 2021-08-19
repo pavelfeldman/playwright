@@ -14,15 +14,19 @@
  * limitations under the License.
  */
 
+import dns from 'dns';
+import net from 'net';
+import util from 'util';
 import * as channels from '../protocol/channels';
+import { TimeoutError } from '../utils/errors';
+import { createSocket } from '../utils/netUtils';
+import { Android } from './android';
 import { BrowserType } from './browserType';
 import { ChannelOwner } from './channelOwner';
-import { Selectors, SelectorsOwner, sharedSelectors } from './selectors';
 import { Electron } from './electron';
-import { TimeoutError } from '../utils/errors';
+import { Selectors, SelectorsOwner, sharedSelectors } from './selectors';
 import { Size } from './types';
-import { Android } from './android';
-import { SocksSocket } from './socksSocket';
+const dnsLookupAsync = util.promisify(dns.lookup);
 
 type DeviceDescriptor = {
   userAgent: string,
@@ -44,7 +48,8 @@ export class Playwright extends ChannelOwner<channels.PlaywrightChannel, channel
   readonly selectors: Selectors;
   readonly errors: { TimeoutError: typeof TimeoutError };
   private _selectorsOwner: SelectorsOwner;
-  _forwardPorts: number[] = [];
+  private _sockets = new Map<string, net.Socket>();
+  private _redirectPortForTest: number | undefined;
 
   constructor(parent: ChannelOwner, type: string, guid: string, initializer: channels.PlaywrightInitializer) {
     super(parent, type, guid, initializer);
@@ -61,17 +66,50 @@ export class Playwright extends ChannelOwner<channels.PlaywrightChannel, channel
 
     this._selectorsOwner = SelectorsOwner.from(initializer.selectors);
     this.selectors._addChannel(this._selectorsOwner);
+  }
 
-    this._channel.on('incomingSocksSocket', ({socket}) => SocksSocket.from(socket));
+  _enablePortForwarding(redirectPortForTest?: number) {
+    this._redirectPortForTest = redirectPortForTest;
+    this._channel.on('socketRequested', ({ uid, host, port }) => this._onSocketRequested(uid, host, port));
+    this._channel.on('socketData', ({ uid, data }) => this._onSocketData(uid, Buffer.from(data, 'base64')));
+    this._channel.on('socketClosed', ({ uid }) => this._onSocketClosed(uid));
+  }
+
+  private async _onSocketRequested(uid: string, host: string, port: number): Promise<void> {
+    try {
+      if (this._redirectPortForTest)
+        port = this._redirectPortForTest;
+      const { address } = await dnsLookupAsync(host);
+      const socket = await createSocket(address, port);
+      socket.on('data', data => this._channel.sendSocketData({ uid, data: data.toString('base64') }).catch(() => {}));
+      socket.on('error', () => {
+        this._channel.sendSocketError({ uid, code: '' }).catch(() => {});
+        this._sockets.delete(uid);
+      });
+      socket.on('end', () => {
+        this._channel.sendSocketEnd({ uid }).catch(() => {});
+        this._sockets.delete(uid);
+      });
+      const localAddress = socket.localAddress;
+      const localPort = socket.localPort;
+      this._sockets.set(uid, socket);
+      this._channel.setSocketLocalAddress({ uid, host: localAddress, port: localPort }).catch(() => {});
+    } catch (error) {
+      this._channel.sendSocketError({ uid, code: error.code || '' }).catch(() => { });
+    }
+  }
+
+  private _onSocketData(uid: string, data: Buffer): void {
+    this._sockets.get(uid)?.write(data);
   }
 
   static from(channel: channels.PlaywrightChannel): Playwright {
     return (channel as any)._object;
   }
 
-  async _enablePortForwarding(ports: number[]) {
-    this._forwardPorts = ports;
-    await this._channel.setForwardedPorts({ports});
+  private _onSocketClosed(uid: string): void {
+    this._sockets.get(uid)?.destroy();
+    this._sockets.delete(uid);
   }
 
   _cleanup() {
