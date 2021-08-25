@@ -169,7 +169,7 @@ test('should throw when used after isConnected returns false', async ({browserTy
   ]);
   expect(browser.isConnected()).toBe(false);
   const error = await page.evaluate('1 + 1').catch(e => e) as Error;
-  expect(error.message).toContain('has been closed');
+  expect(error.message).toContain('Browser closed');
 });
 
 test('should throw when calling waitForNavigation after disconnect', async ({browserType, startRemoteServer}) => {
@@ -194,7 +194,7 @@ test('should reject navigation when browser closes', async ({browserType, startR
   await server.waitForRequest('/one-style.css');
   await browser.close();
   const error = await navigationPromise;
-  expect(error.message).toContain('has been closed');
+  expect(error.message).toContain('Browser closed');
 });
 
 test('should reject waitForSelector when browser closes', async ({browserType, startRemoteServer, server}) => {
@@ -209,7 +209,7 @@ test('should reject waitForSelector when browser closes', async ({browserType, s
 
   await browser.close();
   const error = await watchdog;
-  expect(error.message).toContain('has been closed');
+  expect(error.message).toContain('Browser closed');
 });
 
 test('should emit close events on pages and contexts', async ({browserType, startRemoteServer}) => {
@@ -394,7 +394,7 @@ test('should error when saving download after deletion', async ({server, browser
   const userPath = testInfo.outputPath('download.txt');
   await download.delete();
   const { message } = await download.saveAs(userPath).catch(e => e);
-  expect(message).toContain('Target page, context or browser has been closed');
+  expect(message).toContain('Target closed');
   await browser.close();
 });
 
@@ -419,9 +419,9 @@ test('should properly disconnect when connection closes from the client side', a
   await disconnectedPromise;
   expect(browser.isConnected()).toBe(false);
 
-  expect((await navigationPromise).message).toContain('has been closed');
+  expect((await navigationPromise).message).toContain('Browser closed');
   expect((await waitForNavigationPromise).message).toContain('Navigation failed because page was closed');
-  expect((await page.goto(server.EMPTY_PAGE).catch(e => e)).message).toContain('has been closed');
+  expect((await page.goto(server.EMPTY_PAGE).catch(e => e)).message).toContain('Browser closed');
   expect((await page.waitForNavigation().catch(e => e)).message).toContain('Navigation failed because page was closed');
 });
 
@@ -441,9 +441,9 @@ test('should properly disconnect when connection closes from the server side', a
   await disconnectedPromise;
   expect(browser.isConnected()).toBe(false);
 
-  expect((await navigationPromise).message).toContain('has been closed');
+  expect((await navigationPromise).message).toContain('Browser closed');
   expect((await waitForNavigationPromise).message).toContain('Navigation failed because page was closed');
-  expect((await page.goto(server.EMPTY_PAGE).catch(e => e)).message).toContain('has been closed');
+  expect((await page.goto(server.EMPTY_PAGE).catch(e => e)).message).toContain('Browser closed');
   expect((await page.waitForNavigation().catch(e => e)).message).toContain('Navigation failed because page was closed');
 });
 

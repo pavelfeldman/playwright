@@ -25,7 +25,7 @@ it('should reject all promises when browser is closed', async ({browserType, bro
   await page.evaluate(() => new Promise(f => setTimeout(f, 0)));
   await browser.close();
   await neverResolves;
-  expect(error.message).toContain('Protocol error');
+  expect(error.message).toContain('Target closed');
 });
 
 it('should throw if userDataDir option is passed', async ({browserType, browserOptions}) => {
@@ -67,7 +67,7 @@ it('should reject if launched browser fails immediately', async ({browserType, b
   const options = Object.assign({}, browserOptions, {executablePath: asset('dummy_bad_browser_executable.js')});
   let waitError = null;
   await browserType.launch(options).catch(e => waitError = e);
-  expect(waitError.message).toContain('== logs ==');
+  expect(waitError.message).toContain('Execution log:');
 });
 
 it('should reject if executable path is invalid', async ({browserType, browserOptions}) => {

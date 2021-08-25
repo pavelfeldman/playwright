@@ -26,7 +26,7 @@ import * as dom from '../dom';
 import * as frames from '../frames';
 import { eventsHelper, RegisteredListener } from '../../utils/eventsHelper';
 import { helper } from '../helper';
-import { JSHandle, kSwappedOutErrorMessage } from '../javascript';
+import { JSHandle } from '../javascript';
 import * as network from '../network';
 import { Page, PageBinding, PageDelegate } from '../page';
 import { Progress } from '../progress';
@@ -41,6 +41,7 @@ import { WKInterceptableRequest, WKRouteImpl } from './wkInterceptableRequest';
 import { WKProvisionalPage } from './wkProvisionalPage';
 import { WKWorkers } from './wkWorkers';
 import { debugLogger } from '../../utils/debugLogger';
+import { kTargetClosedError } from '../../utils/errors';
 
 const UTILITY_WORLD_NAME = '__playwright_utility_world__';
 const BINDING_CALL_MESSAGE = '__playwright_binding_call__';
@@ -223,7 +224,6 @@ export class WKPage implements PageDelegate {
     assert(this._provisionalPage);
     assert(this._provisionalPage._session.sessionId === newTargetId, 'Unknown new target: ' + newTargetId);
     assert(this._session.sessionId === oldTargetId, 'Unknown old target: ' + oldTargetId);
-    this._session.errorText = kSwappedOutErrorMessage;
     const newSession = this._provisionalPage._session;
     this._provisionalPage.commit();
     this._provisionalPage.dispose();
@@ -294,7 +294,7 @@ export class WKPage implements PageDelegate {
 
   private async _onTargetCreated(event: Protocol.Target.targetCreatedPayload) {
     const { targetInfo } = event;
-    const session = new WKSession(this._pageProxySession.connection, targetInfo.targetId, `The ${targetInfo.type} has been closed.`, (message: any) => {
+    const session = new WKSession(this._pageProxySession.connection, targetInfo.targetId, (message: any) => {
       this._pageProxySession.send('Target.sendMessageToTarget', {
         message: JSON.stringify(message), targetId: targetInfo.targetId
       }).catch(e => {
@@ -488,7 +488,7 @@ export class WKPage implements PageDelegate {
 
   async navigateFrame(frame: frames.Frame, url: string, referrer: string | undefined): Promise<frames.GotoResult> {
     if (this._pageProxySession.isDisposed())
-      throw new Error('Target closed');
+      throw new Error(kTargetClosedError);
     const pageProxyId = this._pageProxySession.sessionId;
     const result = await this._pageProxySession.connection.browserSession.send('Playwright.navigate', { url, pageProxyId, frameId: frame._id, referrer });
     return { newDocumentId: result.loaderId };
@@ -707,7 +707,7 @@ export class WKPage implements PageDelegate {
 
   goBack(): Promise<boolean> {
     return this._session.send('Page.goBack').then(() => true).catch(error => {
-      if (error instanceof Error && error.message.includes(`Protocol error (Page.goBack): Failed to go`))
+      if (error instanceof Error && error.message.includes(`Failed to go`))
         return false;
       throw error;
     });
@@ -715,7 +715,7 @@ export class WKPage implements PageDelegate {
 
   goForward(): Promise<boolean> {
     return this._session.send('Page.goForward').then(() => true).catch(error => {
-      if (error instanceof Error && error.message.includes(`Protocol error (Page.goForward): Failed to go`))
+      if (error instanceof Error && error.message.includes(`Failed to go`))
         return false;
       throw error;
     });

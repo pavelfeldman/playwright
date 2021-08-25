@@ -103,7 +103,7 @@ export class InjectedScript {
     try {
       const result = this._querySelectorRecursively([{ element: root as Element, capture: undefined }], selector, 0, new Map());
       if (strict && result.length > 1)
-        throw new Error(`strict mode violation: selector resolved to ${result.length} elements.`);
+        throw new Error(`strict selector resolved to ${result.length} elements.`);
       return result[0]?.capture || result[0]?.element;
     } finally {
       this._evaluator.end();

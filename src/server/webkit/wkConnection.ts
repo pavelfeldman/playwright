@@ -22,8 +22,7 @@ import { Protocol } from './protocol';
 import { rewriteErrorMessage } from '../../utils/stackTrace';
 import { debugLogger, RecentLogsCollector } from '../../utils/debugLogger';
 import { ProtocolLogger } from '../types';
-import { helper } from '../helper';
-import { kBrowserClosedError } from '../../utils/errors';
+import { kBrowserClosedError, kTargetClosedError, kTargetCrashedError } from '../../utils/errors';
 
 // WKPlaywright uses this special id to issue Browser.close command which we
 // should ignore.
@@ -50,7 +49,7 @@ export class WKConnection {
     this._onDisconnect = onDisconnect;
     this._protocolLogger = protocolLogger;
     this._browserLogsCollector = browserLogsCollector;
-    this.browserSession = new WKSession(this, '', kBrowserClosedError, (message: any) => {
+    this.browserSession = new WKSession(this, '', (message: any) => {
       this.rawSend(message);
     });
   }
@@ -96,7 +95,6 @@ export class WKConnection {
 
 export class WKSession extends EventEmitter {
   connection: WKConnection;
-  errorText: string;
   readonly sessionId: string;
 
   private _disposed = false;
@@ -110,13 +108,12 @@ export class WKSession extends EventEmitter {
   override removeListener: <T extends keyof Protocol.Events | symbol>(event: T, listener: (payload: T extends symbol ? any : Protocol.Events[T extends keyof Protocol.Events ? T : never]) => void) => this;
   override once: <T extends keyof Protocol.Events | symbol>(event: T, listener: (payload: T extends symbol ? any : Protocol.Events[T extends keyof Protocol.Events ? T : never]) => void) => this;
 
-  constructor(connection: WKConnection, sessionId: string, errorText: string, rawSend: (message: any) => void) {
+  constructor(connection: WKConnection, sessionId: string, rawSend: (message: any) => void) {
     super();
     this.setMaxListeners(0);
     this.connection = connection;
     this.sessionId = sessionId;
     this._rawSend = rawSend;
-    this.errorText = errorText;
 
     this.on = super.on;
     this.off = super.removeListener;
@@ -130,9 +127,9 @@ export class WKSession extends EventEmitter {
     params?: Protocol.CommandParameters[T]
   ): Promise<Protocol.CommandReturnValues[T]> {
     if (this._crashed)
-      throw new Error('Target crashed');
+      throw new Error(kTargetCrashedError);
     if (this._disposed)
-      throw new Error(`Protocol error (${method}): ${this.errorText}`);
+      throw new Error(kTargetClosedError);
     const id = this.connection.nextMessageId();
     const messageObj = { id, method, params };
     this._rawSend(messageObj);
@@ -154,10 +151,8 @@ export class WKSession extends EventEmitter {
   }
 
   dispose(disconnected: boolean) {
-    if (disconnected)
-      this.errorText = 'Browser closed.' + helper.formatBrowserLogs(this.connection._browserLogsCollector.recentLogs());
     for (const callback of this._callbacks.values())
-      callback.reject(rewriteErrorMessage(callback.error, `Protocol error (${callback.method}): ${this.errorText}`));
+      callback.reject(rewriteErrorMessage(callback.error, disconnected ? kBrowserClosedError : kTargetClosedError));
     this._callbacks.clear();
     this._disposed = true;
   }
@@ -167,7 +162,7 @@ export class WKSession extends EventEmitter {
       const callback = this._callbacks.get(object.id)!;
       this._callbacks.delete(object.id);
       if (object.error)
-        callback.reject(createProtocolError(callback.error, callback.method, object.error));
+        callback.reject(createProtocolError(callback.error, object.error));
       else
         callback.resolve(object.result);
     } else if (object.id && !object.error) {
@@ -179,8 +174,8 @@ export class WKSession extends EventEmitter {
   }
 }
 
-export function createProtocolError(error: Error, method: string, protocolError: { message: string; data: any; }): Error {
-  let message = `Protocol error (${method}): ${protocolError.message}`;
+export function createProtocolError(error: Error, protocolError: { message: string; data: any; }): Error {
+  let message = protocolError.message;
   if ('data' in protocolError)
     message += ` ${JSON.stringify(protocolError.data)}`;
   return rewriteErrorMessage(error, message);

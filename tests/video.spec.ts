@@ -590,7 +590,7 @@ it.describe('screencast', () => {
 
     const file = testInfo.outputPath('saved-video-');
     const saveResult = await page.video().saveAs(file).catch(e => e);
-    expect(saveResult.message).toContain('browser has been closed');
+    expect(saveResult.message).toContain('Target closed');
   });
 
   it('should throw if browser dies', async ({browserType, browserOptions, contextOptions}, testInfo) => {
@@ -612,7 +612,7 @@ it.describe('screencast', () => {
 
     const file = testInfo.outputPath('saved-video-');
     const saveResult = await page.video().saveAs(file).catch(e => e);
-    expect(saveResult.message).toContain('rowser has been closed');
+    expect(saveResult.message).toContain(' closed');
   });
 
   it('should wait for video to finish if page was closed', async ({browserType, browserOptions, contextOptions}, testInfo) => {

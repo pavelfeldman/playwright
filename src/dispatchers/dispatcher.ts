@@ -20,7 +20,7 @@ import { serializeError } from '../protocol/serializers';
 import { createScheme, Validator, ValidationError } from '../protocol/validator';
 import { assert, debugAssert, isUnderTest, monotonicTime } from '../utils/utils';
 import { tOptional } from '../protocol/validatorPrimitives';
-import { kBrowserOrContextClosedError } from '../utils/errors';
+import { kTargetClosedError } from '../utils/errors';
 import { CallMetadata, SdkObject } from '../server/instrumentation';
 import { rewriteErrorMessage } from '../utils/stackTrace';
 import type { PlaywrightDispatcher } from './playwrightDispatcher';
@@ -198,7 +198,7 @@ export class DispatcherConnection {
     const { id, guid, method, params, metadata } = message as any;
     const dispatcher = this._dispatchers.get(guid);
     if (!dispatcher) {
-      this.onmessage({ id, error: serializeError(new Error(kBrowserOrContextClosedError)) });
+      this.onmessage({ id, error: serializeError(new Error(kTargetClosedError)) });
       return;
     }
     if (method === 'debugScopeState') {
@@ -303,11 +303,7 @@ export class DispatcherConnection {
 function formatLogRecording(log: string[]): string {
   if (!log.length)
     return '';
-  const header = ` logs `;
-  const headerLength = 60;
-  const leftLength = (headerLength - header.length) / 2;
-  const rightLength = headerLength - header.length - leftLength;
-  return `\n${'='.repeat(leftLength)}${header}${'='.repeat(rightLength)}\n${log.join('\n')}\n${'='.repeat(headerLength)}`;
+  return `\nExecution log:\n${log.join('\n')}\n`;
 }
 
 let lastEventId = 0;

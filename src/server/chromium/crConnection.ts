@@ -23,6 +23,7 @@ import { rewriteErrorMessage } from '../../utils/stackTrace';
 import { debugLogger, RecentLogsCollector } from '../../utils/debugLogger';
 import { ProtocolLogger } from '../types';
 import { helper } from '../helper';
+import { kBrowserClosedError, kTargetClosedError, kTargetCrashedError } from '../../utils/errors';
 
 export const ConnectionEvents = {
   Disconnected: Symbol('ConnectionEvents.Disconnected')
@@ -164,11 +165,11 @@ export class CRSession extends EventEmitter {
     params?: Protocol.CommandParameters[T]
   ): Promise<Protocol.CommandReturnValues[T]> {
     if (this._crashed)
-      throw new Error('Target crashed');
+      throw new Error(kTargetCrashedError);
     if (this._browserDisconnectedLogs !== undefined)
-      throw new Error(`Protocol error (${method}): Browser closed.` + this._browserDisconnectedLogs);
+      throw new Error(kBrowserClosedError + '.' + this._browserDisconnectedLogs);
     if (!this._connection)
-      throw new Error(`Protocol error (${method}): Session closed. Most likely the ${this._targetType} has been closed.`);
+      throw new Error(kTargetClosedError);
     const id = this._connection._rawSend(this._sessionId, method, params);
     return new Promise((resolve, reject) => {
       this._callbacks.set(id, {resolve, reject, error: new Error(), method});
@@ -184,7 +185,7 @@ export class CRSession extends EventEmitter {
       const callback = this._callbacks.get(object.id)!;
       this._callbacks.delete(object.id);
       if (object.error)
-        callback.reject(createProtocolError(callback.error, callback.method, object.error));
+        callback.reject(createProtocolError(callback.error, object.error));
       else
         callback.resolve(object.result);
     } else {
@@ -208,17 +209,17 @@ export class CRSession extends EventEmitter {
 
   _onClosed(browserDisconnectedLogs: string | undefined) {
     this._browserDisconnectedLogs = browserDisconnectedLogs;
-    const errorMessage = browserDisconnectedLogs !== undefined ? 'Browser closed.' + browserDisconnectedLogs : 'Target closed.';
+    const errorMessage = browserDisconnectedLogs !== undefined ? kBrowserClosedError : kTargetClosedError;
     for (const callback of this._callbacks.values())
-      callback.reject(rewriteErrorMessage(callback.error, `Protocol error (${callback.method}): ` + errorMessage));
+      callback.reject(rewriteErrorMessage(callback.error, errorMessage));
     this._callbacks.clear();
     this._connection = null;
     Promise.resolve().then(() => this.emit(CRSessionEvents.Disconnected));
   }
 }
 
-function createProtocolError(error: Error, method: string, protocolError: { message: string; data: any; }): Error {
-  let message = `Protocol error (${method}): ${protocolError.message}`;
+function createProtocolError(error: Error, protocolError: { message: string; data: any; }): Error {
+  let message = protocolError.message;
   if ('data' in protocolError)
     message += ` ${protocolError.data}`;
   return rewriteErrorMessage(error, message);

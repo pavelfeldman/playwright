@@ -46,7 +46,7 @@ export class WKExecutionContext implements js.ExecutionContextDelegate {
         returnByValue: true
       });
       if (response.wasThrown)
-        throw new Error('Evaluation failed: ' + response.result.description);
+        throw new Error(response.result.description);
       return response.result.value;
     } catch (error) {
       throw rewriteError(error);
@@ -61,7 +61,7 @@ export class WKExecutionContext implements js.ExecutionContextDelegate {
         returnByValue: false
       });
       if (response.wasThrown)
-        throw new Error('Evaluation failed: ' + response.result.description);
+        throw new Error(response.result.description);
       return response.result.objectId!;
     } catch (error) {
       throw rewriteError(error);
@@ -96,7 +96,7 @@ export class WKExecutionContext implements js.ExecutionContextDelegate {
         })
       ]);
       if (response.wasThrown)
-        throw new Error('Evaluation failed: ' + response.result.description);
+        throw new Error(response.result.description);
       if (returnByValue)
         return parseEvaluationResultValue(response.result.value);
       return utilityScript._context.createHandle(response.result);
@@ -132,7 +132,7 @@ export class WKExecutionContext implements js.ExecutionContextDelegate {
 const contextDestroyedResult = {
   wasThrown: true,
   result: {
-    description: 'Protocol error: Execution context was destroyed, most likely because of a navigation.'
+    description: 'Execution context was destroyed, most likely because of a navigation.'
   } as Protocol.Runtime.RemoteObject
 };
 

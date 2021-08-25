@@ -23,8 +23,30 @@ import { mkdirIfNeeded } from '../../utils/utils';
 import { splitErrorMessage } from '../../utils/stackTrace';
 
 export function getExceptionMessage(exceptionDetails: Protocol.Runtime.ExceptionDetails): string {
-  if (exceptionDetails.exception)
-    return exceptionDetails.exception.description || String(exceptionDetails.exception.value);
+  return innerGetExceptionMessage(exceptionDetails, false);
+}
+
+export function getExceptionMessageWithStack(exceptionDetails: Protocol.Runtime.ExceptionDetails): string {
+  return innerGetExceptionMessage(exceptionDetails, true);
+}
+
+function innerGetExceptionMessage(exceptionDetails: Protocol.Runtime.ExceptionDetails, includeStack: boolean): string {
+  if (exceptionDetails.exception) {
+    if (exceptionDetails.exception.description) {
+      if (!includeStack) {
+        const lines = exceptionDetails.exception.description.split('\n');
+        const messageLines: string[] = [];
+        for (const line of lines) {
+          if (line.startsWith('    at '))
+            break;
+          messageLines.push(line);
+        }
+        return messageLines.join('\n');
+      }
+      return exceptionDetails.exception.description;
+    }
+    return String(exceptionDetails.exception.value);
+  }
   let message = exceptionDetails.text;
   if (exceptionDetails.stackTrace) {
     for (const callframe of exceptionDetails.stackTrace.callFrames) {
@@ -71,7 +93,7 @@ export function toConsoleMessageLocation(stackTrace: Protocol.Runtime.StackTrace
 }
 
 export function exceptionToError(exceptionDetails: Protocol.Runtime.ExceptionDetails): Error {
-  const messageWithStack = getExceptionMessage(exceptionDetails);
+  const messageWithStack = getExceptionMessageWithStack(exceptionDetails);
   const lines = messageWithStack.split('\n');
   const firstStackTraceLine = lines.findIndex(line => line.startsWith('    at'));
   let messageWithName = '';

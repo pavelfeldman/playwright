@@ -132,9 +132,5 @@ function waitForTimeout(timeout: number): { promise: Promise<void>, dispose: () 
 function formatLogRecording(log: string[]): string {
   if (!log.length)
     return '';
-  const header = ` logs `;
-  const headerLength = 60;
-  const leftLength = (headerLength - header.length) / 2;
-  const rightLength = headerLength - header.length - leftLength;
-  return `\n${'='.repeat(leftLength)}${header}${'='.repeat(rightLength)}\n${log.join('\n')}\n${'='.repeat(headerLength)}`;
+  return `\nExecution log:\n${log.join('\n')}\n`;
 }

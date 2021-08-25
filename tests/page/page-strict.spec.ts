@@ -19,35 +19,35 @@ import { test as it, expect } from './pageTest';
 it('should fail page.textContent in strict mode', async ({ page }) => {
   await page.setContent(`<span>span1</span><div><span>target</span></div>`);
   const error = await page.textContent('span', { strict: true }).catch(e => e);
-  expect(error.message).toContain('strict mode violation');
+  expect(error.message).toContain('strict selector resolved');
 });
 
 it('should fail page.getAttribute in strict mode', async ({ page }) => {
   await page.setContent(`<span>span1</span><div><span>target</span></div>`);
   const error = await page.getAttribute('span', 'id', { strict: true }).catch(e => e);
-  expect(error.message).toContain('strict mode violation');
+  expect(error.message).toContain('strict selector resolved');
 });
 
 it('should fail page.fill in strict mode', async ({ page }) => {
   await page.setContent(`<input></input><div><input></input></div>`);
   const error = await page.fill('input', 'text', { strict: true }).catch(e => e);
-  expect(error.message).toContain('strict mode violation');
+  expect(error.message).toContain('strict selector resolved');
 });
 
 it('should fail page.$ in strict mode', async ({ page }) => {
   await page.setContent(`<span>span1</span><div><span>target</span></div>`);
   const error = await page.$('span', { strict: true }).catch(e => e);
-  expect(error.message).toContain('strict mode violation');
+  expect(error.message).toContain('strict selector resolved');
 });
 
 it('should fail page.waitForSelector in strict mode', async ({ page }) => {
   await page.setContent(`<span>span1</span><div><span>target</span></div>`);
   const error = await page.waitForSelector('span', { strict: true }).catch(e => e);
-  expect(error.message).toContain('strict mode violation');
+  expect(error.message).toContain('strict selector resolved');
 });
 
 it('should fail page.dispatchEvent in strict mode', async ({ page }) => {
   await page.setContent(`<span></span><div><span></span></div>`);
   const error = await page.dispatchEvent('span', 'click', {}, { strict: true }).catch(e => e);
-  expect(error.message).toContain('strict mode violation');
+  expect(error.message).toContain('strict selector resolved');
 });

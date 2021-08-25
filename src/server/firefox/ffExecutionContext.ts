@@ -103,9 +103,9 @@ function checkException(exceptionDetails?: Protocol.Runtime.ExceptionDetails) {
   if (!exceptionDetails)
     return;
   if (exceptionDetails.value)
-    throw new Error('Evaluation failed: ' + JSON.stringify(exceptionDetails.value));
+    throw new Error(JSON.stringify(exceptionDetails.value));
   else
-    throw new Error('Evaluation failed: ' + exceptionDetails.text + '\n' + exceptionDetails.stack);
+    throw new Error(exceptionDetails.text + '\n' + exceptionDetails.stack);
 }
 
 function rewriteError(error: Error): (Protocol.Runtime.evaluateReturnValue | Protocol.Runtime.callFunctionReturnValue) {

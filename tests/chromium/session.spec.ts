@@ -78,7 +78,7 @@ it('should be able to detach session', async function({page}) {
   } catch (e) {
     error = e;
   }
-  expect(error.message).toContain('Target page, context or browser has been closed');
+  expect(error.message).toContain('Target closed');
 });
 
 it('should throw nice errors', async function({page}) {

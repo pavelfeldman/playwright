@@ -25,9 +25,10 @@ class CustomError extends Error {
 
 export class TimeoutError extends CustomError {}
 
-export const kBrowserClosedError = 'Browser has been closed';
-export const kBrowserOrContextClosedError = 'Target page, context or browser has been closed';
+export const kBrowserClosedError = 'Browser closed';
+export const kTargetClosedError = 'Target closed';
+export const kTargetCrashedError = 'Target crashed';
 
 export function isSafeCloseError(error: Error) {
-  return error.message.endsWith(kBrowserClosedError) || error.message.endsWith(kBrowserOrContextClosedError);
+  return error.message.endsWith(kBrowserClosedError) || error.message.endsWith(kTargetClosedError);
 }

@@ -29,5 +29,5 @@ it('should not accept after close', async ({page}) => {
   const dialog = await page.waitForEvent('dialog');
   await page.close();
   const e = await dialog.dismiss().catch(e => e);
-  expect(e.message).toContain('Target page, context or browser has been closed');
+  expect(e.message).toContain('Target closed');
 });

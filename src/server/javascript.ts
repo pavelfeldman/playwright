@@ -280,8 +280,6 @@ export function normalizeEvaluationExpression(expression: string, isFunction: bo
   return expression;
 }
 
-export const kSwappedOutErrorMessage = 'Target was swapped out.';
-
 export function isContextDestroyedError(e: any) {
   if (!e || typeof e !== 'object' || typeof e.message !== 'string')
     return false;
@@ -295,10 +293,6 @@ export function isContextDestroyedError(e: any) {
 
   // Evaluation promise is rejected when context is gone.
   if (e.message.includes('Execution context was destroyed'))
-    return true;
-
-  // WebKit target swap.
-  if (e.message.includes(kSwappedOutErrorMessage))
     return true;
 
   return false;
