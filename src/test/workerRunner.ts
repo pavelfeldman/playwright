@@ -20,7 +20,7 @@ import rimraf from 'rimraf';
 import util from 'util';
 import colors from 'colors/safe';
 import { EventEmitter } from 'events';
-import { monotonicTime, DeadlineRunner, raceAgainstDeadline, serializeError, sanitizeForFilePath } from './util';
+import { monotonicTime, serializeError, sanitizeForFilePath } from './util';
 import { TestBeginPayload, TestEndPayload, RunPayload, TestEntry, DonePayload, WorkerInitParams, StepBeginPayload, StepEndPayload } from './ipc';
 import { setCurrentTestInfo } from './globals';
 import { Loader } from './loader';
@@ -28,6 +28,7 @@ import { Modifier, Suite, TestCase } from './test';
 import { Annotations, CompleteStepCallback, TestError, TestInfo, TestInfoImpl, WorkerInfo } from './types';
 import { ProjectImpl } from './project';
 import { FixturePool, FixtureRunner } from './fixtures';
+import { DeadlineRunner, raceAgainstDeadline } from '../utils/async';
 
 const removeFolderAsync = util.promisify(rimraf);
 

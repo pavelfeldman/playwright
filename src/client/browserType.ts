@@ -23,7 +23,8 @@ import { Connection } from './connection';
 import { Events } from './events';
 import { ChildProcess } from 'child_process';
 import { envObjectToArray } from './clientHelper';
-import { assert, headersObjectToArray, getUserAgent, ManualPromise } from '../utils/utils';
+import { assert, headersObjectToArray, getUserAgent } from '../utils/utils';
+import { ManualPromise } from '../utils/async';
 import * as api from '../../types/types';
 import { kBrowserClosedError } from '../utils/errors';
 
