@@ -17,10 +17,15 @@
 
 import { test as it, expect } from './pageTest';
 
-it('should check the box', async ({page}) => {
+it('should check the box', async ({page}, testInfo) => {
   await page.setContent(`<input id='checkbox' type='checkbox'></input>`);
   await page.check('input');
-  expect(await page.evaluate(() => window['checkbox'].checked)).toBe(true);
+  testInfo.attachments.push({
+    name: 'aaa',
+    body: Buffer.from('AAA'.repeat(100)),
+    contentType: 'text/plain'
+  });
+  expect(await page.evaluate(() => window['checkbox'].checked)).toBe(false);
 });
 
 it('should not check the checked box', async ({page}) => {
