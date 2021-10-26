@@ -72,6 +72,7 @@ for (const browserName of browserNames) {
   const executablePath = getExecutablePath(browserName);
   if (executablePath && !process.env.TEST_WORKER_INDEX)
     console.error(`Using executable at ${executablePath}`);
+  const devtools = process.env.DEVTOOLS === '1';
   const testIgnore: RegExp[] = browserNames.filter(b => b !== browserName).map(b => new RegExp(b));
   testIgnore.push(/android/, /electron/, /playwright-test/);
   config.projects.push({
@@ -84,7 +85,10 @@ for (const browserName of browserNames) {
       headless: !headed,
       channel,
       video,
-      executablePath,
+      launchOptions: {
+        executablePath,
+        devtools
+      },
       trace,
       coverageName: browserName,
     },
