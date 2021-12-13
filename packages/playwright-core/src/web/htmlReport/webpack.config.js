@@ -25,6 +25,7 @@ module.exports = {
   entry: {
     zip: path.resolve(__dirname, '../../../../../node_modules/@zip.js/zip.js/dist/zip-no-worker-inflate.min.js'),
     app: path.join(__dirname, 'index.tsx'),
+    playwright: path.join(__dirname, 'playwright.stories.tsx'),
   },
   resolve: {
     extensions: ['.ts', '.js', '.tsx', '.jsx']
@@ -58,6 +59,7 @@ module.exports = {
     new HtmlWebPackPlugin({
       title: 'Playwright Test Report',
       template: path.join(__dirname, 'index.html'),
+      excludeChunks: ['playwright'],
       inject: true,
     }),
     new BundleJsPlugin(),
