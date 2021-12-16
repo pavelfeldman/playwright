@@ -18,6 +18,7 @@ import { AutoChip, Chip } from './src/chip';
 import { HeaderView } from './src/headerView';
 import { TestCaseView } from './src/testCaseView';
 import './src/theme.css';
+import './src/testTheme.css';
 import { registerComponent } from './test/component';
 
 registerComponent('HeaderView', HeaderView);

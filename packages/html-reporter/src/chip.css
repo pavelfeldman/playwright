@@ -52,19 +52,19 @@
 
 @media only screen and (max-width: 600px) {
   .chip-header {
-    border-radius: 0;
-    border-right: none;
-    border-left: none;
+    border-radius: 0 !important;
+    border-right: none !important;
+    border-left: none !important;
   }
 
   .chip-body {
-    border-radius: 0;
-    border-right: none;
-    border-left: none;
-    padding: 8px;
+    border-radius: 0 !important;
+    border-right: none !important;
+    border-left: none !important;
+    padding: 8px !important;
   }
 
   .chip-body-no-insets {
-    padding: 0; 
+    padding: 0 !important; 
   }
 }

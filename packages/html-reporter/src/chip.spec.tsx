@@ -19,37 +19,58 @@ import { expect, test } from '../test/componentTest';
 import { AutoChip, Chip } from './chip';
 
 test.use({ webpack: require.resolve('../webpack.config.js') });
-test.use({ viewport: { width: 500, height: 500 } });
 
-test('expand collapse', async ({ render, capture }) => {
-  const component = await render(<AutoChip header='title'>
-    Chip body
-  </AutoChip>);
-  await expect(component.locator('text=Chip body')).toBeVisible();
-  await capture(component, 'expanded');
-  await component.locator('text=Title').click();
-  await expect(component.locator('text=Chip body')).not.toBeVisible();
-  await capture(component, 'collapsed');
-  await component.locator('text=Title').click();
-  await expect(component.locator('text=Chip body')).toBeVisible();
+test.describe('mobile viewport', () => {
+  test.use({ viewport: { width: 500, height: 500 } });
+
+  test('expand collapse', async ({ render }) => {
+    const component = await render(<AutoChip header='title'>
+      Chip body
+    </AutoChip>);
+    await expect(component.locator('text=Chip body')).toBeVisible();
+    expect(await component.screenshot()).toMatchSnapshot({ name: 'mobile-expanded.png' });
+    await component.locator('text=Title').click();
+    await expect(component.locator('text=Chip body')).not.toBeVisible();
+    expect(await component.screenshot()).toMatchSnapshot({ name: 'mobile-collapsed.png' });
+    await component.locator('text=Title').click();
+    await expect(component.locator('text=Chip body')).toBeVisible();
+  });
 });
 
-test('render long title', async ({ render, capture }) => {
-  const title = 'Extremely long title. '.repeat(10);
-  const component = await render(<AutoChip header={title}>
-    Chip body
-  </AutoChip>);
-  await expect(component).toContainText('Extremely long title.');
-  await expect(component.locator('text=Extremely long title.')).toHaveAttribute('title', title);
-  await capture(component, 'long-title');
-});
+test.describe('desktop viewport', () => {
+  test.use({ viewport: { width: 720, height: 500 } });
 
-test('setExpanded is called', async ({ render, capture }) => {
-  const expandedValues: boolean[] = [];
-  const component = await render(<Chip header='Title'
-    setExpanded={(expanded: boolean) => expandedValues.push(expanded)}>
-  </Chip>);
+  test('expand collapse', async ({ render }) => {
+    const component = await render(<AutoChip header='title'>
+      Chip body
+    </AutoChip>);
+    await expect(component.locator('text=Chip body')).toBeVisible();
+    expect(await component.screenshot()).toMatchSnapshot({ name: 'desktop-expanded.png' });
+    await component.locator('text=Title').click();
+    await expect(component.locator('text=Chip body')).not.toBeVisible();
+    expect(await component.screenshot()).toMatchSnapshot({ name: 'desktop-collapsed.png' });
+    await component.locator('text=Title').click();
+    await expect(component.locator('text=Chip body')).toBeVisible();
+  });
 
-  await component.locator('text=Title').click();
-  expect(expandedValues).toEqual([true]);
+  test('render long title', async ({ render }) => {
+    const title = 'Extremely long title. '.repeat(10);
+    const component = await render(<AutoChip header={title}>
+      Chip body
+    </AutoChip>);
+    await expect(component).toContainText('Extremely long title.');
+    await expect(component.locator('text=Extremely long title.')).toHaveAttribute('title', title);
+    expect(await component.screenshot()).toMatchSnapshot({ name: 'long-title.png' });
+  });
+
+  test('setExpanded is called', async ({ render }) => {
+    const expandedValues: boolean[] = [];
+    const component = await render(<Chip header='Title'
+      setExpanded={(expanded: boolean) => expandedValues.push(expanded)}>
+    </Chip>);
+
+    await component.locator('text=Title').click();
+    expect(expandedValues).toEqual([true]);
+  });
+
 });

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import * as path from 'path';
+import path from 'path';
 import { test as baseTest, Locator } from '@playwright/test';
 
 declare global {
@@ -25,13 +25,13 @@ declare global {
 
 type TestFixtures = {
   render: (component: { type: string, props: Object }) => Promise<Locator>;
-  capture: (locator: Locator, name: string) => Promise<void>;
   webpack: string;
 };
 
 export const test = baseTest.extend<TestFixtures>({
   webpack: '',
-  render: async ({ page, webpack }, use) => {
+  render: async ({ page, webpack }, use, testInfo) => {
+    testInfo.snapshotSuffix = '';
     const webpackConfig = require(webpack);
     const outputPath = webpackConfig.output.path;
     const filename = webpackConfig.output.filename.replace('[name]', 'playwright');
@@ -69,14 +69,6 @@ export const test = baseTest.extend<TestFixtures>({
       return page.locator('#pw-root');
     });
   },
-
-  capture: async ({}, use, testInfo) => {
-    await use(async (locator: Locator, name: string) => {
-      const screenshotPath = path.join(__dirname, '..', 'screenshots', sanitizeForFilePath(path.basename(testInfo.file) + '-' + testInfo.title + '-' + name) + '.png');
-      testInfo.attachments.push({ name, path: screenshotPath, contentType: 'image/png' });
-      await locator.screenshot({ path: screenshotPath });
-    });
-  }
 });
 
 export function sanitizeForFilePath(s: string) {

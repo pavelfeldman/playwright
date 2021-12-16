@@ -59,9 +59,9 @@ const testCase: TestCase = {
   results: [result]
 };
 
-test('should render test case', async ({ render, capture }) => {
+test('should render test case', async ({ render }) => {
   const component = await render(<TestCaseView projectNames={['chromium', 'webkit']} test={testCase}></TestCaseView>);
-  await capture(component, 'testcase');
+  expect(await component.screenshot()).toMatchSnapshot({ name: 'testcase.png' });
   await expect(component.locator('text=Annotation text').first()).toBeVisible();
   await component.locator('text=Annotations').click();
   await expect(component.locator('text=Annotation text')).not.toBeVisible();
@@ -71,5 +71,5 @@ test('should render test case', async ({ render, capture }) => {
   await expect(component.locator('text=Inner step')).toBeVisible();
   await expect(component.locator('text=test.spec.ts:42')).toBeVisible();
   await expect(component.locator('text=My test')).toBeVisible();
-  await capture(component, 'testcase-expanded');
+  expect(await component.screenshot()).toMatchSnapshot({ name: 'testcase-expanded.png' });
 });

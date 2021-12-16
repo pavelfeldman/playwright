@@ -33,6 +33,7 @@ module.exports = {
   devtool: mode === 'production' ? false : 'source-map',
   output: {
     globalObject: 'self',
+    publicPath: '',
     filename: '[name].bundle.js',
     path: path.resolve(__dirname, '..', 'playwright-core', 'lib', 'webpack', 'htmlReport')
   },

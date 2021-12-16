@@ -18,7 +18,7 @@ import { PlaywrightTestConfig, devices } from '@playwright/test';
 
 const config: PlaywrightTestConfig = {
   testDir: 'src',
-  snapshotDir: 'snapshots',
+  snapshotDir: 'screenshots',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [
