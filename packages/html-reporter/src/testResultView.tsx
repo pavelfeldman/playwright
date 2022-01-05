@@ -121,11 +121,15 @@ const ImageDiff: React.FunctionComponent<{
  diff?: TestAttachment,
 }> = ({ actual, expected, diff }) => {
   const [selectedTab, setSelectedTab] = React.useState<string>('actual');
+  const diffElement = React.useRef<HTMLImageElement>(null);
   const tabs = [];
   tabs.push({
     id: 'actual',
     title: 'Actual',
-    render: () => <img src={actual.path}/>
+    render: () => <img src={actual.path} onLoad={() => {
+      if (diffElement.current)
+        diffElement.current.style.minHeight = diffElement.current.offsetHeight + 'px';
+    }}/>
   });
   tabs.push({
     id: 'expected',
@@ -139,7 +143,7 @@ const ImageDiff: React.FunctionComponent<{
       render: () => <img src={diff.path}/>
     });
   }
-  return <div className='vbox' data-testid='test-result-image-mismatch'>
+  return <div className='vbox' data-testid='test-result-image-mismatch' ref={diffElement}>
     <TabbedPane tabs={tabs} selectedTab={selectedTab} setSelectedTab={setSelectedTab} />
   </div>;
 };
