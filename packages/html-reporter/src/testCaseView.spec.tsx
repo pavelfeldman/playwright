@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 import React from 'react';
-import { test, expect } from '../test/componentTest';
+import { test, expect } from '@playwright/test';
 import { TestCaseView } from './testCaseView';
 import type { TestCase, TestResult } from '../../playwright-test/src/reporters/html';
 
-test.use({ webpack: require.resolve('../webpack.config.js') });
 test.use({ viewport: { width: 800, height: 600 } });
 
 const result: TestResult = {

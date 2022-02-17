@@ -14,8 +14,20 @@
  * limitations under the License.
  */
 
-const React = require('react');
-const ReactDOM = require('react-dom');
+import React from 'react';
+import ReactDOM from 'react-dom';
+
+export type Component = {
+  type: string;
+  props: Object;
+  children: (Component | string)[];
+};
+
+declare global {
+  interface Window {
+    __playwright_render: (component: Component) => void;
+  }
+}
 
 const fillStyle = {
   position: 'absolute',
@@ -45,7 +57,7 @@ const checkerboardDark = {
                     linear-gradient(45deg, #FFFFFF12 25%, transparent 25%, transparent 75%, #FFFFFF12 75%, #FFFFFF12)`
 };
 
-const Component = ({ style, children }) => {
+const Component = ({ style, children }: { style: Object, children: Object[] }) => {
   const checkerboard = window.matchMedia('(prefers-color-scheme: dark)').matches ? checkerboardDark : checkerboardLight;
   const bgStyle = { ...checkerboard };
   const fgStyle = { ...fillStyle, ...style };
@@ -57,11 +69,11 @@ const Component = ({ style, children }) => {
 
 const registry = new Map();
 
-export const registerComponent = (name, componentFunc) => {
+export const register = (name: string, componentFunc: any) => {
   registry.set(name, componentFunc);
 };
 
-function render(component) {
+function render(component: Component): React.DOMElement<any, any> {
   const componentFunc = registry.get(component.type) || component.type;
   return React.createElement(componentFunc, component.props, ...component.children.map(child => {
     if (typeof child === 'string')
@@ -70,7 +82,7 @@ function render(component) {
   }));
 }
 
-window.__playwright_render = component => {
+(window as any).__playwright_render = (component: Component) => {
   ReactDOM.render(
     React.createElement(Component, null, render(component)),
     document.getElementById('root'));

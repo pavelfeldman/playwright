@@ -25,6 +25,7 @@ import { prependToTestError } from './util';
 export { expect } from './expect';
 export const _baseTest: TestType<{}, {}> = rootTestType.test;
 import * as outOfProcess from 'playwright-core/lib/outofprocess';
+import { Component } from './react';
 
 if ((process as any)['__pw_initiator__']) {
   const originalStackTraceLimit = Error.stackTraceLimit;
@@ -492,8 +493,33 @@ export const test = _baseTest.extend<TestFixtures, WorkerFixtures>({
     const request = await playwright.request.newContext(_combinedContextOptions);
     await use(request);
     await request.dispose();
-  }
+  },
 
+  mount: async ({ page, baseURL }, use) => {
+    await use(async (component: Component) => {
+      await page.goto(baseURL!);
+
+      const props = { ...component.props };
+      for (const [key, value] of Object.entries(props)) {
+        if (typeof value === 'function') {
+          const functionName = '__pw_func_' + key;
+          await page.exposeFunction(functionName, value);
+          (props as any)[key] = functionName;
+        }
+      }
+
+      await page.evaluate(v => {
+        const props = v.props;
+        for (const [key, value] of Object.entries(props)) {
+          if (typeof value === 'string' && (value as string).startsWith('__pw_func_'))
+            (props as any)[key] = (window as any)[value];
+        }
+        window.__playwright_render({ ...v, props });
+      }, { ...component, props });
+
+      return page.locator('#pw-root');
+    });
+  }
 });
 
 
