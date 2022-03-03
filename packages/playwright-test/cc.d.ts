@@ -15,3 +15,4 @@
  */
 
 export const bindReact: (name: string, component: any) => void;
+export const bindVue: (createApp: any, name: string, component: any) => void;

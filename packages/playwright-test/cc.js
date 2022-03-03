@@ -15,6 +15,7 @@
  */
 
 const { bindReact } = require('./lib/cc/react/renderer');
+const { bindVue } = require('./lib/cc/vue/renderer');
 
-Object.defineProperty({ bindReact }, '__esModule', { value: true });
-module.exports = { bindReact };
+Object.defineProperty({ bindReact, bindVue }, '__esModule', { value: true });
+module.exports = { bindReact, bindVue };

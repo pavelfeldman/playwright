@@ -28,6 +28,7 @@ import { GridServer } from 'playwright-core/lib/grid/gridServer';
 import dockerFactory from 'playwright-core/lib/grid/dockerGridFactory';
 import { createGuid } from 'playwright-core/lib/utils/utils';
 import { fileIsModule } from './loader';
+import { build as vueBuild, watch as vueWatch } from './cc/vue/runner';
 
 const defaultTimeout = 30000;
 const defaultReporter: BuiltInReporter = process.env.CI ? 'dot' : 'list';
@@ -36,6 +37,7 @@ export function addPlaywrightTestCommands(program: Command) {
   addTestCommand(program);
   addShowReportCommand(program);
   addListFilesCommand(program);
+  addComponentCommand(program);
 }
 
 export function addTestCommand(program: Command) {
@@ -107,6 +109,17 @@ Arguments [report]:
 Examples:
   $ npx playwright show-report
   $ npx playwright show-report playwright-report`);
+}
+
+export function addComponentCommand(program: Command) {
+  const cc = program.command('cc', { hidden: true });
+  const vue = cc.command('vue');
+  vue.command('build').action(() => {
+    vueBuild();
+  });
+  vue.command('watch').action(() => {
+    vueWatch();
+  });
 }
 
 async function runTests(args: string[], opts: { [key: string]: any }) {
