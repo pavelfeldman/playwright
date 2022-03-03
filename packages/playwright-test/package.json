@@ -13,6 +13,7 @@
       "import": "./index.mjs",
       "require": "./index.js"
     },
+    "./cc": "./cc.js",
     "./cli": "./cli.js",
     "./package.json": "./package.json",
     "./lib/cli": "./lib/cli.js",

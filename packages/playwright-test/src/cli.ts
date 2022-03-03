@@ -32,6 +32,12 @@ import { fileIsModule } from './loader';
 const defaultTimeout = 30000;
 const defaultReporter: BuiltInReporter = process.env.CI ? 'dot' : 'list';
 
+export function addPlaywrightTestCommands(program: Command) {
+  addTestCommand(program);
+  addShowReportCommand(program);
+  addListFilesCommand(program);
+}
+
 export function addTestCommand(program: Command) {
   const command = program.command('test [test-filter...]');
   command.description('Run tests with Playwright Test');

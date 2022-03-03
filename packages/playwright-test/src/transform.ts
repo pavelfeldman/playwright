@@ -215,7 +215,7 @@ export function installTransform(): () => void {
   }
   (Module as any)._resolveFilename = resolveFilename;
 
-  const exts = ['.ts', '.tsx'];
+  const exts = ['.ts', '.tsx', '.vue'];
   // When script preprocessor is engaged, we transpile JS as well.
   if (scriptPreprocessor)
     exts.push('.js', '.mjs');
@@ -262,7 +262,7 @@ export function setCurrentlyLoadingTestFile(file: string | null) {
 function isComponentImport(filename: string): boolean {
   if (filename === currentlyLoadingTestFile)
     return false;
-  return filename.endsWith('.tsx') || filename.endsWith('.jsx');
+  return filename.endsWith('.tsx') || filename.endsWith('.jsx') || filename.endsWith('.vue');
 }
 
 function componentStub(): string {

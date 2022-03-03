@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import path from 'path';
 import { PlaywrightTestConfig, devices } from '@playwright/test';
 
 const config: PlaywrightTestConfig = {
@@ -27,12 +28,15 @@ const config: PlaywrightTestConfig = {
     ['html', { open: 'on-failure' }]
   ],
   use: {
+    baseURL: 'file://' + path.join(__dirname, 'lib', 'folio', 'index.html').replace(path.sep, '/'),
     trace: 'on-first-retry',
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+      },
     },
   ],
 };

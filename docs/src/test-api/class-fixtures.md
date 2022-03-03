@@ -60,6 +60,14 @@ Learn how to [configure context](./test-configuration.md) and see [available opt
 
 Default [`property: Fixtures.page`] belongs to this context.
 
+## method: Fixtures.mount
+- returns: <[Locator]>
+
+Mount component for testing.
+
+### param: Fixtures.mount.component
+- type: <[any]>
+
 ## property: Fixtures.page
 - type: <[Page]>
 

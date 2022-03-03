@@ -66,6 +66,26 @@ export default declare(api => {
           t.objectProperty(t.identifier('props'), t.objectExpression(props)),
           t.objectProperty(t.identifier('children'), t.arrayExpression(children)),
         ]));
+      },
+
+      CallExpression(path) {
+        // Vue version
+        const callNode = path.node;
+        if (!t.isIdentifier(callNode.callee) || callNode.callee.name !== 'mount' || !callNode.arguments.length)
+          return;
+        if (!t.isIdentifier(callNode.arguments[0]))
+          return;
+
+        const name = callNode.arguments[0].name;
+        const props = callNode.arguments[1] as any;
+
+        path.replaceWith(t.callExpression(callNode.callee, [
+          t.objectExpression([
+            t.objectProperty(t.identifier('type'), t.stringLiteral(name)),
+            t.objectProperty(t.identifier('props'), props),
+          ])
+        ]));
+        path.skip();
       }
     }
   };

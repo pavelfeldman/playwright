@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { APIRequestContext, Browser, BrowserContext, BrowserContextOptions, Page, LaunchOptions, ViewportSize, Geolocation, HTTPCredentials } from 'playwright-core';
+import type { APIRequestContext, Browser, BrowserContext, BrowserContextOptions, Page, Locator, LaunchOptions, ViewportSize, Geolocation, HTTPCredentials } from 'playwright-core';
 import type { Expect } from './testExpect';
 
 export type { Expect } from './testExpect';
@@ -376,6 +376,7 @@ export interface PlaywrightTestArgs {
   context: BrowserContext;
   page: Page;
   request: APIRequestContext;
+  mount: (...component: any[]) => Promise<Locator>;
 }
 
 export type PlaywrightTestProject<TestArgs = {}, WorkerArgs = {}> = Project<PlaywrightTestOptions & TestArgs, PlaywrightWorkerOptions & WorkerArgs>;

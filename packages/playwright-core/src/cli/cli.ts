@@ -273,9 +273,7 @@ if (!process.env.PW_LANG_NAME) {
   } catch {}
 
   if (playwrightTestPackagePath) {
-    require(playwrightTestPackagePath).addTestCommand(program);
-    require(playwrightTestPackagePath).addShowReportCommand(program);
-    require(playwrightTestPackagePath).addListFilesCommand(program);
+    require(playwrightTestPackagePath).addPlaywrightTestCommands(program);
   } else {
     {
       const command = program.command('test').allowUnknownOption(true);
