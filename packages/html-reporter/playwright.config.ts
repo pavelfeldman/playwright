@@ -15,10 +15,10 @@
  */
 
 import { PlaywrightTestConfig, devices } from '@playwright/test';
+import path from 'path';
 
 const config: PlaywrightTestConfig = {
   testDir: 'src',
-  snapshotDir: 'snapshots',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [
@@ -27,6 +27,7 @@ const config: PlaywrightTestConfig = {
     ['html', { open: 'on-failure' }]
   ],
   use: {
+    baseURL: 'file://' + path.join(__dirname, 'out-ct', 'index.html').replace(path.sep, '/'),
     trace: 'on-first-retry',
   },
   projects: [

@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import * as path from 'path';
 import { test as baseTest, Locator } from '@playwright/test';
 
 type Component = {
@@ -25,7 +24,7 @@ type Component = {
 
 declare global {
   interface Window {
-    __playwright_render: (component: Component) => void;
+    playwrightMount: (component: Component) => Promise<string>;
   }
 }
 
@@ -35,25 +34,9 @@ type TestFixtures = {
 };
 
 export const test = baseTest.extend<TestFixtures>({
-  webpack: '',
-  mount: async ({ page, webpack }, use) => {
-    const webpackConfig = require(webpack);
-    const outputPath = webpackConfig.output.path;
-    const filename = webpackConfig.output.filename.replace('[name]', 'playwright');
+  mount: async ({ page, baseURL }, use) => {
     await use(async (component: Component) => {
-      await page.route('http://component/index.html', route => {
-        route.fulfill({
-          body: `<html>
-              <meta name='color-scheme' content='dark light'>
-              <style>html, body { padding: 0; margin: 0; background: #aaa; }</style>
-              <div id='root' style='width: 100%; height: 100%;'></div>
-            </html>`,
-          contentType: 'text/html'
-        });
-      });
-      await page.goto('http://component/index.html');
-
-      await page.addScriptTag({ path: path.resolve(__dirname, outputPath, filename) });
+      await page.goto(baseURL!);
 
       const props = { ...component.props };
       for (const [key, value] of Object.entries(props)) {
@@ -69,9 +52,9 @@ export const test = baseTest.extend<TestFixtures>({
           if (typeof value === 'string' && (value as string).startsWith('__pw_func_'))
             (props as any)[key] = (window as any)[value];
         }
-        window.__playwright_render({ ...v, props });
+        window.playwrightMount({ ...v, props });
       }, { ...component, props });
-      return page.locator('#pw-root');
+      return page.locator('#root');
     });
   },
 });

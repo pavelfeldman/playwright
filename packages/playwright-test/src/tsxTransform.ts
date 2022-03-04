@@ -34,9 +34,17 @@ export default declare(api => {
 
         for (const jsxAttribute of jsxElement.openingElement.attributes) {
           if (t.isJSXAttribute(jsxAttribute)) {
-            if (!t.isJSXIdentifier(jsxAttribute.name))
+            let namespace: t.JSXIdentifier | undefined;
+            let name: t.JSXIdentifier | undefined;
+            if (t.isJSXNamespacedName(jsxAttribute.name)) {
+              namespace = jsxAttribute.name.namespace;
+              name = jsxAttribute.name.name;
+            } else if (t.isJSXIdentifier(jsxAttribute.name)) {
+              name = jsxAttribute.name;
+            }
+            if (!name)
               continue;
-            const attrName = jsxAttribute.name.name;
+            const attrName = (namespace ? namespace.name + ':' : '') + name.name;
             if (t.isStringLiteral(jsxAttribute.value))
               props.push(t.objectProperty(t.stringLiteral(attrName), jsxAttribute.value));
             else if (t.isJSXExpressionContainer(jsxAttribute.value) && t.isExpression(jsxAttribute.value.expression))
@@ -58,14 +66,33 @@ export default declare(api => {
             children.push(child.expression);
           else if (t.isJSXSpreadChild(child))
             children.push(t.spreadElement(child.expression));
-
         }
 
         path.replaceWith(t.objectExpression([
+          t.objectProperty(t.identifier('kind'), t.stringLiteral('jsx')),
           t.objectProperty(t.identifier('type'), t.stringLiteral(name)),
           t.objectProperty(t.identifier('props'), t.objectExpression(props)),
           t.objectProperty(t.identifier('children'), t.arrayExpression(children)),
         ]));
+      },
+
+      CallExpression(path) {
+        // Non-tsx vue transform, replace mount(App, props) with mount({ name: 'App', props })
+        const callNode = path.node;
+        if (!t.isIdentifier(callNode.callee) || callNode.callee.name !== 'mount' || !callNode.arguments.length)
+          return;
+        if (!t.isIdentifier(callNode.arguments[0]))
+          return;
+        const name = callNode.arguments[0].name;
+        const options = callNode.arguments[1] as any || t.identifier('undefined');
+        path.replaceWith(t.callExpression(callNode.callee, [
+          t.objectExpression([
+            t.objectProperty(t.identifier('kind'), t.stringLiteral('object')),
+            t.objectProperty(t.identifier('type'), t.stringLiteral(name)),
+            t.objectProperty(t.identifier('options'), options),
+          ])
+        ]));
+        path.skip();
       }
     }
   };

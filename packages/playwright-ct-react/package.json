@@ -1,0 +1,11 @@
+{
+    "name": "@playwright/ct-react",
+    "private": true,
+    "exports": {
+        ".": "./index.mjs",
+        "./test": {
+            "import": "./test.mjs",
+            "require": "./test.js"
+        }
+    }
+}
