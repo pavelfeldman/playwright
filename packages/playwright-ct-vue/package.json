@@ -6,6 +6,10 @@
         "./test": {
             "import": "./test.mjs",
             "require": "./test.js"
-        }
+        },
+        "./vitePlugin": "./vitePlugin.js"
+    },
+    "dependencies": {
+        "glob": "^7.2.0"
     }
 }
