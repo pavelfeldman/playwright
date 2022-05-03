@@ -293,8 +293,10 @@ export class Runner {
 
     const outputDirs = new Set<string>();
     const rootSuite = new Suite('');
+    const projectImpls: ProjectImpl[] = [];
     for (const [project, files] of filesByProject) {
       const projectImpl = new ProjectImpl(project, config.projects.indexOf(project));
+      projectImpls.push(projectImpl);
       const grepMatcher = createTitleMatcher(project.grep);
       const grepInvertMatcher = project.grepInvert ? createTitleMatcher(project.grepInvert) : null;
       const projectSuite = new Suite(project.name);
@@ -392,7 +394,7 @@ export class Runner {
     }
 
     // 13. Run Global setup.
-    const globalTearDown = await this._performGlobalSetup(config, rootSuite);
+    const globalTearDown = await this._performGlobalSetup(config, rootSuite, projectImpls);
     if (!globalTearDown)
       return { status: 'failed' };
 
@@ -431,13 +433,19 @@ export class Runner {
     return result;
   }
 
-  private async _performGlobalSetup(config: FullConfigInternal, rootSuite: Suite): Promise<(() => Promise<void>) | undefined> {
+  private async _performGlobalSetup(config: FullConfigInternal, rootSuite: Suite, projectImpls: ProjectImpl[]): Promise<(() => Promise<void>) | undefined> {
     const result: FullResult = { status: 'passed' };
-    const pluginTeardowns: (() => Promise<void>)[] = [];
+    const globalFixtureTeardown: (() => Promise<void>)[] = [];
     let globalSetupResult: any;
 
     const tearDown = async () => {
       // Reverse to setup.
+      for (const teardown of globalFixtureTeardown.reverse()) {
+        await this._runAndReportError(async () => {
+          await teardown();
+        }, result);
+      }
+
       await this._runAndReportError(async () => {
         if (globalSetupResult && typeof globalSetupResult === 'function')
           await globalSetupResult(this._loader.fullConfig());
@@ -448,9 +456,9 @@ export class Runner {
           await (await this._loader.loadGlobalHook(config.globalTeardown, 'globalTeardown'))(this._loader.fullConfig());
       }, result);
 
-      for (const teardown of pluginTeardowns) {
+      for (const plugin of config._plugins.slice().reverse()) {
         await this._runAndReportError(async () => {
-          await teardown();
+          await plugin.teardown?.();
         }, result);
       }
     };
@@ -458,15 +466,21 @@ export class Runner {
     await this._runAndReportError(async () => {
       // First run the plugins, if plugin is a web server we want it to run before the
       // config's global setup.
-      for (const plugin of config._plugins) {
+      for (const plugin of config._plugins)
         await plugin.setup?.(rootSuite);
-        if (plugin.teardown)
-          pluginTeardowns.unshift(plugin.teardown);
-      }
 
-      // The do global setup.
+      // Then do global setup.
       if (config.globalSetup)
         globalSetupResult = await (await this._loader.loadGlobalHook(config.globalSetup, 'globalSetup'))(this._loader.fullConfig(), this._globalInfo);
+
+      // Then do global fixtures.
+      for (const projectImpl of projectImpls) {
+        globalFixtureTeardown.push(...await projectImpl.setupGlobalFixtures({
+          config,
+          configDir: config._configDir,
+          rootSuite
+        }));
+      }
     }, result);
 
     if (result.status !== 'passed') {

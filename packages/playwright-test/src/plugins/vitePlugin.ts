@@ -31,7 +31,7 @@ export function createPlugin(
     port?: number,
     config?: InlineConfig
   } = {}): TestPlugin {
-  const viteConfig = options.config || {};
+  const viteConfig = { ...options.config };
   const port = options.port || 3100;
   let configDir: string;
   return {

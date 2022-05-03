@@ -20,8 +20,9 @@ import type { FixturesWithLocation, Location, WorkerInfo } from './types';
 import { ManualPromise } from 'playwright-core/lib/utils/manualPromise';
 import type { TestInfoImpl } from './testInfo';
 import type { FixtureDescription, TimeoutManager } from './timeoutManager';
+import type { GlobalInfo } from './project';
 
-type FixtureScope = 'test' | 'worker';
+type FixtureScope = 'test' | 'worker' | 'global';
 type FixtureOptions = { auto?: boolean, scope?: FixtureScope, option?: boolean, timeout?: number | undefined };
 type FixtureTuple = [ value: any, options: FixtureOptions ];
 type FixtureRegistration = {
@@ -64,7 +65,7 @@ class Fixture {
     };
   }
 
-  async setup(testInfo: TestInfoImpl) {
+  async setup(globalInfo?: GlobalInfo, testInfo?: TestInfoImpl) {
     if (typeof this.registration.fn !== 'function') {
       this.value = this.registration.fn;
       return;
@@ -73,7 +74,7 @@ class Fixture {
     const params: { [key: string]: any } = {};
     for (const name of this.registration.deps) {
       const registration = this.runner.pool!.resolveDependency(this.registration, name)!;
-      const dep = await this.runner.setupFixtureForRegistration(registration, testInfo);
+      const dep = await this.runner.setupFixtureForRegistration(registration, globalInfo, testInfo);
       dep.usages.add(this);
       params[name] = dep.value;
     }
@@ -90,9 +91,14 @@ class Fixture {
       useFuncStarted.resolve();
       await this._useFuncFinished;
     };
-    const workerInfo: WorkerInfo = { config: testInfo.config, parallelIndex: testInfo.parallelIndex, workerIndex: testInfo.workerIndex, project: testInfo.project };
-    const info = this.registration.scope === 'worker' ? workerInfo : testInfo;
-    testInfo._timeoutManager.setCurrentFixture(this._runnableDescription);
+    let info: TestInfoImpl | WorkerInfo | GlobalInfo;
+    if (testInfo && this.registration.scope === 'worker')
+      info = { config: testInfo.config, parallelIndex: testInfo.parallelIndex, workerIndex: testInfo.workerIndex, project: testInfo.project };
+    else if (testInfo)
+      info = testInfo;
+    else
+      info = globalInfo!;
+    testInfo?._timeoutManager.setCurrentFixture(this._runnableDescription);
     this._selfTeardownComplete = Promise.resolve().then(() => this.registration.fn(params, useFunc, info)).catch((e: any) => {
       if (!useFuncStarted.isDone())
         useFuncStarted.reject(e);
@@ -100,7 +106,7 @@ class Fixture {
         throw e;
     });
     await useFuncStarted;
-    testInfo._timeoutManager.setCurrentFixture(undefined);
+    testInfo?._timeoutManager.setCurrentFixture(undefined);
   }
 
   async teardown(timeoutManager: TimeoutManager) {
@@ -174,7 +180,7 @@ export class FixturePool {
           options = { auto: false, scope: 'test', option: false, timeout: undefined, customTitle: undefined };
         }
 
-        if (options.scope !== 'test' && options.scope !== 'worker')
+        if (options.scope !== 'test' && options.scope !== 'worker' && options.scope !== 'global')
           throw errorWithLocations(`Fixture "${name}" has unknown { scope: '${options.scope}' }.`, { location, name });
         if (options.scope === 'worker' && disallowWorkerFixtures)
           throw errorWithLocations(`Cannot use({ ${name} }) in a describe group, because it forces a new worker.\nMake it top-level in the test file or put in the configuration file.`, { location, name });
@@ -282,12 +288,22 @@ export class FixtureRunner {
       throw error;
   }
 
-  async resolveParametersForFunction(fn: Function, testInfo: TestInfoImpl): Promise<object> {
+  async setupGlobalFixtures(globalInfo: GlobalInfo, use: any): Promise<any> {
+    // Install all automatic fixtures.
+    for (const registration of this.pool!.registrations.values()) {
+      if (registration.scope !== 'global')
+        continue;
+      const fixture = await this.setupFixtureForRegistration(registration, globalInfo);
+      use[registration.name] = fixture.value;
+    }
+  }
+
+  async resolveParametersForFunction(fn: Function, globalInfo?: GlobalInfo, testInfo?: TestInfoImpl): Promise<object> {
     // Install all automatic fixtures.
     for (const registration of this.pool!.registrations.values()) {
       const shouldSkip = !testInfo && registration.scope === 'test';
       if (registration.auto && !shouldSkip)
-        await this.setupFixtureForRegistration(registration, testInfo);
+        await this.setupFixtureForRegistration(registration, globalInfo, testInfo);
     }
 
     // Install used fixtures.
@@ -295,18 +311,18 @@ export class FixtureRunner {
     const params: { [key: string]: any } = {};
     for (const name of names) {
       const registration = this.pool!.registrations.get(name)!;
-      const fixture = await this.setupFixtureForRegistration(registration, testInfo);
+      const fixture = await this.setupFixtureForRegistration(registration, globalInfo, testInfo);
       params[name] = fixture.value;
     }
     return params;
   }
 
-  async resolveParametersAndRunFunction(fn: Function, testInfo: TestInfoImpl) {
-    const params = await this.resolveParametersForFunction(fn, testInfo);
+  async resolveParametersAndRunFunction(fn: Function, globalInfo?: GlobalInfo, testInfo?: TestInfoImpl) {
+    const params = await this.resolveParametersForFunction(fn, globalInfo, testInfo);
     return fn(params, testInfo);
   }
 
-  async setupFixtureForRegistration(registration: FixtureRegistration, testInfo: TestInfoImpl): Promise<Fixture> {
+  async setupFixtureForRegistration(registration: FixtureRegistration, globalInfo?: GlobalInfo, testInfo?: TestInfoImpl): Promise<Fixture> {
     if (registration.scope === 'test')
       this.testScopeClean = false;
 
@@ -316,7 +332,7 @@ export class FixtureRunner {
 
     fixture = new Fixture(this, registration);
     this.instanceForId.set(registration.id, fixture);
-    await fixture.setup(testInfo);
+    await fixture.setup(globalInfo, testInfo);
     return fixture;
   }
 

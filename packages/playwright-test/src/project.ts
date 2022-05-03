@@ -14,12 +14,19 @@
  * limitations under the License.
  */
 
-import type { Fixtures, FixturesWithLocation, FullProjectInternal } from './types';
+import type { Config, Fixtures, FixturesWithLocation, FullProjectInternal } from './types';
 import type { TestCase } from './test';
 import { Suite } from './test';
-import { FixturePool, isFixtureOption } from './fixtures';
+import { FixturePool, FixtureRunner, isFixtureOption } from './fixtures';
 import type { TestTypeImpl } from './testType';
 import { calculateSha1 } from 'playwright-core/lib/utils';
+import { TimeoutManager } from './timeoutManager';
+
+export type GlobalInfo = {
+  config: Config,
+  configDir: string,
+  rootSuite: Suite,
+};
 
 export class ProjectImpl {
   config: FullProjectInternal;
@@ -117,5 +124,19 @@ export class ProjectImpl {
       }
       return { fixtures: resolved, location: f.location };
     });
+  }
+
+  async setupGlobalFixtures(globalInfo: GlobalInfo): Promise<(() => Promise<void>)[]> {
+    globalInfo.config.use = globalInfo.config.use || {};
+    const timeoutManager = new TimeoutManager(Number.MAX_SAFE_INTEGER);
+    const dispose: (() => Promise<void>)[] = [];
+    for (const pool of this.testTypePools.values()) {
+      const runner = new FixtureRunner();
+      runner.setPool(pool);
+      await runner.setupGlobalFixtures(globalInfo, globalInfo.config.use);
+      dispose.push(() => runner.teardownScope('global', timeoutManager));
+    }
+    console.log(globalInfo.config.use);
+    return dispose;
   }
 }

@@ -16,23 +16,16 @@
 
 import type { PlaywrightTestConfig } from '@playwright/test';
 import { devices } from '@playwright/test';
-import viteCT from '@playwright/experimental-ct-react/vitePlugin';
 
 const config: PlaywrightTestConfig = {
   testDir: 'src',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? [
-    ['html', { open: 'never' }],
-  ] : [
-    ['html', { open: 'on-failure' }]
-  ],
-  plugins: [
-    viteCT({ port: 3101 })
-  ],
+  reporter: 'html',
   use: {
     trace: 'on-first-retry',
-  },
+    port: 3101,
+  } as any,
   projects: [
     {
       name: 'chromium',

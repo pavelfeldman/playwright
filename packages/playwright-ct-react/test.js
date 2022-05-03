@@ -16,8 +16,29 @@
 
 const { test: baseTest, expect } = require('@playwright/test');
 const { mount } = require('@playwright/test/lib/mount');
+const vitePlugin = require('./vitePlugin');
 
 const test = baseTest.extend({
+  port: [undefined, { scope: 'global', option: true }],
+
+  viteConfig: [async ({ }, use) => {
+    console.log('VITE CONFIG COMPUTE', process.pid);
+    await use({ a: 123 });
+  }, { scope: 'global', option: true }],
+
+  _viteDevServer: [async ({ viteConfig, port }, use, globalInfo) => {
+    const plugin = vitePlugin({ config: viteConfig, port });
+    await plugin.configure(globalInfo.config, globalInfo.configDir);
+    await plugin.setup(globalInfo.rootSuite);
+    await use();
+    await plugin.teardown();
+  }, { scope: 'global' }],
+
+  baseURL: async ({ port, viteConfig }, use) => {
+    console.log('VITE CONFIG use', viteConfig, process.pid);
+    await use(`http://localhost:${port}/playwright/index.html`);
+  },
+
   _workerPage: [async ({ browser }, use) => {
     const page = await browser.newPage();
     await page.addInitScript('navigator.serviceWorker.register = () => {}');
