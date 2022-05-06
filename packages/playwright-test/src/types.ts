@@ -45,6 +45,7 @@ export interface FullConfigInternal extends FullConfigPublic {
   _configDir: string;
   _testGroupsCount: number;
   _plugins: TestPlugin[];
+  _pluginFixtures: string[];
 
   // Overrides the public field.
   projects: FullProjectInternal[];
@@ -55,7 +56,6 @@ export interface FullConfigInternal extends FullConfigPublic {
  * increasing the surface area of the public API type called FullProject.
  */
 export interface FullProjectInternal extends FullProjectPublic {
-  _fullConfig: FullConfigInternal;
   _fullyParallel: boolean;
   _expect: Project['expect'];
   _screenshotsDir: string;

@@ -22,6 +22,7 @@ export type SerializedLoaderData = {
   configFile: string | undefined;
   configDir: string;
   configCLIOverrides: ConfigCLIOverrides;
+  pluginFixtureFiles: string[];
 };
 
 export type WorkerInitParams = {
