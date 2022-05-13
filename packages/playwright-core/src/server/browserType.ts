@@ -44,12 +44,14 @@ export const kNoXServerRunningError = 'Looks like you launched a headed browser 
 export abstract class BrowserType extends SdkObject {
   private _name: BrowserName;
   readonly _playwrightOptions: PlaywrightOptions;
+  private _transportMode: 'cbor' | 'json';
 
-  constructor(browserName: BrowserName, playwrightOptions: PlaywrightOptions) {
+  constructor(browserName: BrowserName, playwrightOptions: PlaywrightOptions, transportMode: 'cbor' | 'json') {
     super(playwrightOptions.rootSdkObject, 'browser-type');
     this.attribution.browserType = this;
     this._playwrightOptions = playwrightOptions;
     this._name = browserName;
+    this._transportMode = transportMode;
   }
 
   executablePath(): string {
@@ -250,7 +252,7 @@ export abstract class BrowserType extends SdkObject {
       transport = await WebSocketTransport.connect(progress, wsEndpoint!);
     } else {
       const stdio = launchedProcess.stdio as unknown as [NodeJS.ReadableStream, NodeJS.WritableStream, NodeJS.WritableStream, NodeJS.WritableStream, NodeJS.ReadableStream];
-      transport = new PipeTransport(stdio[3], stdio[4]);
+      transport = new PipeTransport(stdio[3], stdio[4], this._transportMode);
     }
     return { browserProcess, artifactsDir, userDataDir, transport };
   }

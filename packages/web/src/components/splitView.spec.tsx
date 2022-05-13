@@ -20,6 +20,8 @@ import { SplitView } from './splitView';
 
 test.use({ viewport: { width: 500, height: 500 } });
 
+for (let i = 0; i < 10; ++i) test.describe('group ' + i, () => {
+
 test('should render', async ({ mount }) => {
   const component = await mount(<SplitView sidebarSize={100}>
     <div id='main' style={{ border: '1px solid red', flex: 'auto' }}>main</div>
@@ -75,4 +77,6 @@ test('drag resize', async ({ page, mount }) => {
   const sidebarBox = await component.locator('#sidebar').boundingBox();
   expect.soft(mainBox).toEqual({ x: 0, y: 0, width: 500, height: 100 });
   expect.soft(sidebarBox).toEqual({ x: 0, y: 101, width: 500, height: 399 });
+});
+
 });

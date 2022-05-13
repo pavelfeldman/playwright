@@ -28,7 +28,7 @@ import { wrapInASCIIBox } from '../../utils';
 
 export class WebKit extends BrowserType {
   constructor(playwrightOptions: PlaywrightOptions) {
-    super('webkit', playwrightOptions);
+    super('webkit', playwrightOptions, 'json');
   }
 
   _connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<WKBrowser> {

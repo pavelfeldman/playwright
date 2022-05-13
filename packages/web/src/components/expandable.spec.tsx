@@ -20,6 +20,8 @@ import { Expandable } from './expandable';
 
 test.use({ viewport: { width: 500, height: 500 } });
 
+for (let i = 0; i < 10; ++i) test.describe('group ' + i, () => {
+
 test('should render collapsed', async ({ mount }) => {
   const component = await mount(<Expandable expanded={false} setExpanded={() => {}} title='Title'>Details text</Expandable>);
   await expect(component.locator('text=Title')).toBeVisible();
@@ -39,4 +41,6 @@ test('click should expand', async ({ mount }) => {
   const component = await mount(<Expandable expanded={false} setExpanded={e => expanded = e} title='Title'>Details text</Expandable>);
   await component.locator('.codicon-chevron-right').click();
   expect(expanded).toBeTruthy();
+});
+
 });

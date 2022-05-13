@@ -69,6 +69,9 @@ class Program
 }
 `;
 
+for (let i = 0; i < 10; ++i) test.describe('group ' + i, () => {
+
+
 test('highlight JavaScript', async ({ mount }) => {
   const component = await mount(<Source text={javascriptSnippet} language='javascript'></Source>);
   await expect(component.locator('text="async"').first()).toHaveClass('hljs-keyword');
@@ -98,4 +101,6 @@ test('highlight lines', async ({ mount }) => {
   await expect(component.locator('.source-line-running')).toContainText('goto');
   await expect(component.locator('.source-line-paused')).toContainText('title');
   await expect(component.locator('.source-line-error')).toContainText('expect');
+});
+
 });

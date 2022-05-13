@@ -52,7 +52,7 @@ export class Chromium extends BrowserType {
   private _devtools: CRDevTools | undefined;
 
   constructor(playwrightOptions: PlaywrightOptions) {
-    super('chromium', playwrightOptions);
+    super('chromium', playwrightOptions, 'cbor');
 
     if (debugMode())
       this._devtools = this._createDevTools();
@@ -259,7 +259,7 @@ export class Chromium extends BrowserType {
     if (options.useWebSocket)
       chromeArguments.push('--remote-debugging-port=0');
     else
-      chromeArguments.push('--remote-debugging-pipe');
+      chromeArguments.push('--remote-debugging-pipe=cbor');
     if (isPersistent)
       chromeArguments.push('about:blank');
     else

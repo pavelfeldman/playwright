@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+import cborLibrary from 'cbor';
+export const cbor = cborLibrary;
+
 import colorsLibrary from 'colors/safe';
 export const colors = colorsLibrary;
 

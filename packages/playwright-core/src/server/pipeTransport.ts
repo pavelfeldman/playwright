@@ -18,19 +18,32 @@
 import type { ConnectionTransport, ProtocolRequest, ProtocolResponse } from './transport';
 import { makeWaitForNextTask } from '../utils';
 import { debugLogger } from '../common/debugLogger';
+import { cbor } from '../utilsBundle';
+import { encode } from 'packages/playwright-core/bundles/utils/node_modules/cbor/types/lib/encoder';
 
 export class PipeTransport implements ConnectionTransport {
   private _pipeWrite: NodeJS.WritableStream;
   private _pendingMessage = '';
   private _waitForNextTask = makeWaitForNextTask();
   private _closed = false;
+  private _transportMode: 'cbor' | 'json';
 
   onmessage?: (message: ProtocolResponse) => void;
   onclose?: () => void;
+  private _decoder: any;
 
-  constructor(pipeWrite: NodeJS.WritableStream, pipeRead: NodeJS.ReadableStream) {
+  constructor(pipeWrite: NodeJS.WritableStream, pipeRead: NodeJS.ReadableStream, transportMode: 'cbor' | 'json') {
     this._pipeWrite = pipeWrite;
-    pipeRead.on('data', buffer => this._dispatch(buffer));
+    this._transportMode = transportMode;
+
+    this._decoder = new cbor.Decoder();
+    this._decoder.on('data', (obj: any) => {
+      console.log(obj)
+    });
+    if (transportMode === 'json')
+      pipeRead.on('data', buffer => this._dispatchJSON(buffer));
+    else
+      pipeRead.on('data', buffer => this._dispatchCBOR(buffer));
     pipeRead.on('close', () => {
       this._closed = true;
       if (this.onclose)
@@ -45,15 +58,19 @@ export class PipeTransport implements ConnectionTransport {
   send(message: ProtocolRequest) {
     if (this._closed)
       throw new Error('Pipe has been closed');
-    this._pipeWrite.write(JSON.stringify(message));
-    this._pipeWrite.write('\0');
+    if (this._transportMode === 'json') {
+      this._pipeWrite.write(JSON.stringify(message));
+      this._pipeWrite.write('\0');
+    } else {
+      this._pipeWrite.write(yoshaSerialize(message));
+    }
   }
 
   close() {
     throw new Error('unimplemented');
   }
 
-  _dispatch(buffer: Buffer) {
+  _dispatchJSON(buffer: Buffer) {
     let end = buffer.indexOf('\0');
     if (end === -1) {
       this._pendingMessage += buffer.toString();
@@ -78,4 +95,38 @@ export class PipeTransport implements ConnectionTransport {
     }
     this._pendingMessage = buffer.toString(undefined, start);
   }
+
+  _dispatchCBOR(buffer: Buffer) {
+    console.log(buffer.toString());
+    this._decoder.write(buffer);
+  }
+}
+
+function yoshaSerialize(message: any, isNested = false) {
+  const encoder = new cbor.Encoder();
+  message.params = message.params || null;
+  
+  encoder._pushUInt8(0xd8); // envelope tag
+  encoder._pushUInt8(0x5a); // expect 32-bit length
+  encoder._pushUInt32BE(0); // save space for length
+
+  encoder._pushUInt8((5 << 5) | 31); // indefinite map
+  for (const key in message) {
+    const value = message[key];
+    encoder._pushString(key);
+    if (!isNested && key === 'params' && value) {
+      encoder.push(yoshaSerialize(value, true));
+      continue;
+    }
+    if (value && typeof value === 'object')
+      cbor.Encoder.encodeIndefinite(encoder, value);
+    else {
+      encoder.pushAny(value);
+    }
+  }
+  encoder.push(Buffer.from([0xff])); // break
+
+  const encoded = encoder._encodeAll([]);
+  encoded.writeInt32BE(encoded.length - 6, 2);
+  return encoded;
 }

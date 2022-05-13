@@ -30,7 +30,7 @@ import { wrapInASCIIBox } from '../../utils';
 
 export class Firefox extends BrowserType {
   constructor(playwrightOptions: PlaywrightOptions) {
-    super('firefox', playwrightOptions);
+    super('firefox', playwrightOptions, 'json');
   }
 
   _connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<FFBrowser> {
