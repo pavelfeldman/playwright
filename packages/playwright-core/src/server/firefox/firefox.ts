@@ -27,23 +27,24 @@ import type { BrowserOptions, PlaywrightOptions } from '../browser';
 import type * as types from '../types';
 import { rewriteErrorMessage } from '../../utils/stackTrace';
 import { wrapInASCIIBox } from '../../utils';
+import { extract } from '../../zipBundle';
 
 export class Firefox extends BrowserType {
   constructor(playwrightOptions: PlaywrightOptions) {
     super('firefox', playwrightOptions);
   }
 
-  _connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<FFBrowser> {
+  connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<FFBrowser> {
     return FFBrowser.connect(transport, options);
   }
 
-  _rewriteStartupError(error: Error): Error {
+  rewriteStartupError(error: Error): Error {
     if (error.message.includes('no DISPLAY environment variable specified'))
       return rewriteErrorMessage(error, '\n' + wrapInASCIIBox(kNoXServerRunningError, 1));
     return error;
   }
 
-  _amendEnvironment(env: Env, userDataDir: string, executable: string, browserArguments: string[]): Env {
+  amendEnvironment(env: Env, userDataDir: string, executable: string, browserArguments: string[]): Env {
     if (!path.isAbsolute(os.homedir()))
       throw new Error(`Cannot launch Firefox with relative home directory. Did you set ${os.platform() === 'win32' ? 'USERPROFILE' : 'HOME'} to a relative path?`);
     if (os.platform() === 'linux') {
@@ -56,12 +57,19 @@ export class Firefox extends BrowserType {
     return env;
   }
 
-  _attemptToGracefullyCloseBrowser(transport: ConnectionTransport): void {
+  attemptToGracefullyCloseBrowser(transport: ConnectionTransport): void {
     const message = { method: 'Browser.close', params: {}, id: kBrowserCloseMessageId };
     transport.send(message);
   }
 
-  _defaultArgs(options: types.LaunchOptions, isPersistent: boolean, userDataDir: string): string[] {
+  override async reuseDefaultProfileFromRegistry(directory: string, userDataDir: string) {
+    const profileZip = path.join(directory, 'profile.zip');
+    if (!fs.existsSync(profileZip))
+      return;
+    await extract(profileZip, { dir: userDataDir });
+  }
+
+  defaultArgs(options: types.LaunchOptions, isPersistent: boolean, userDataDir: string): string[] {
     const { args = [], headless } = options;
     const userDataDirArg = args.find(arg => arg.startsWith('-profile') || arg.startsWith('--profile'));
     if (userDataDirArg)

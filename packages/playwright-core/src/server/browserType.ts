@@ -70,7 +70,7 @@ export abstract class BrowserType extends SdkObject {
       const seleniumHubUrl = (options as any).__testHookSeleniumRemoteURL || process.env.SELENIUM_REMOTE_URL;
       if (seleniumHubUrl)
         return this._launchWithSeleniumHub(progress, seleniumHubUrl, options);
-      return this._innerLaunchWithRetries(progress, options, undefined, helper.debugProtocolLogger(protocolLogger)).catch(e => { throw this._rewriteStartupError(e); });
+      return this._innerLaunchWithRetries(progress, options, undefined, helper.debugProtocolLogger(protocolLogger)).catch(e => { throw this.rewriteStartupError(e); });
     }, TimeoutSettings.timeout(options));
     return browser;
   }
@@ -81,7 +81,7 @@ export abstract class BrowserType extends SdkObject {
     const persistent: channels.BrowserNewContextParams = options;
     controller.setLogName('browser');
     const browser = await controller.run(progress => {
-      return this._innerLaunchWithRetries(progress, options, persistent, helper.debugProtocolLogger(), userDataDir).catch(e => { throw this._rewriteStartupError(e); });
+      return this._innerLaunchWithRetries(progress, options, persistent, helper.debugProtocolLogger(), userDataDir).catch(e => { throw this.rewriteStartupError(e); });
     }, TimeoutSettings.timeout(options));
     return browser._defaultContext!;
   }
@@ -127,7 +127,7 @@ export abstract class BrowserType extends SdkObject {
     if (persistent)
       validateBrowserContextOptions(persistent, browserOptions);
     copyTestHooks(options, browserOptions);
-    const browser = await this._connectToTransport(transport, browserOptions);
+    const browser = await this.connectToTransport(transport, browserOptions);
     (browser as any)._userDataDirForTest = userDataDir;
     // We assume no control when using custom arguments, and do not prepare the default context in that case.
     if (persistent && !options.ignoreAllDefaultArgs)
@@ -135,7 +135,11 @@ export abstract class BrowserType extends SdkObject {
     return browser;
   }
 
+  async reuseDefaultProfileFromRegistry(directory: string, userDataDir: string) {
+  }
+
   private async _launchProcess(progress: Progress, options: types.LaunchOptions, isPersistent: boolean, browserLogsCollector: RecentLogsCollector, userDataDir?: string): Promise<{ browserProcess: BrowserProcess, artifactsDir: string, userDataDir: string, transport: ConnectionTransport }> {
+    console.time('LAUNCH PROCESS');
     const {
       ignoreDefaultArgs,
       ignoreAllDefaultArgs,
@@ -170,9 +174,9 @@ export abstract class BrowserType extends SdkObject {
     if (ignoreAllDefaultArgs)
       browserArguments.push(...args);
     else if (ignoreDefaultArgs)
-      browserArguments.push(...this._defaultArgs(options, isPersistent, userDataDir).filter(arg => ignoreDefaultArgs.indexOf(arg) === -1));
+      browserArguments.push(...this.defaultArgs(options, isPersistent, userDataDir).filter(arg => ignoreDefaultArgs.indexOf(arg) === -1));
     else
-      browserArguments.push(...this._defaultArgs(options, isPersistent, userDataDir));
+      browserArguments.push(...this.defaultArgs(options, isPersistent, userDataDir));
 
     let executable: string;
     if (executablePath) {
@@ -185,6 +189,7 @@ export abstract class BrowserType extends SdkObject {
         throw new Error(`Unsupported ${this._name} channel "${options.channel}"`);
       executable = registryExecutable.executablePathOrDie(this._playwrightOptions.sdkLanguage);
       await registryExecutable.validateHostRequirements(this._playwrightOptions.sdkLanguage);
+      await this.reuseDefaultProfileFromRegistry(registryExecutable.directory!, userDataDir);
     }
 
     const waitForWSEndpoint = (options.useWebSocket || options.args?.some(a => a.startsWith('--remote-debugging-port'))) ? new ManualPromise<string>() : undefined;
@@ -196,7 +201,7 @@ export abstract class BrowserType extends SdkObject {
     const { launchedProcess, gracefullyClose, kill } = await launchProcess({
       command: executable,
       args: browserArguments,
-      env: this._amendEnvironment(env, userDataDir, executable, browserArguments),
+      env: this.amendEnvironment(env, userDataDir, executable, browserArguments),
       handleSIGINT,
       handleSIGTERM,
       handleSIGHUP,
@@ -219,7 +224,7 @@ export abstract class BrowserType extends SdkObject {
         // We try to gracefully close to prevent crash reporting and core dumps.
         // Note that it's fine to reuse the pipe transport, since
         // our connection ignores kBrowserCloseMessageId.
-        this._attemptToGracefullyCloseBrowser(transport!);
+        this.attemptToGracefullyCloseBrowser(transport!);
       },
       onExit: (exitCode, signal) => {
         // Unblock launch when browser prematurely exits.
@@ -279,11 +284,11 @@ export abstract class BrowserType extends SdkObject {
     return { ...options, devtools, headless, downloadsPath, proxy };
   }
 
-  abstract _defaultArgs(options: types.LaunchOptions, isPersistent: boolean, userDataDir: string): string[];
-  abstract _connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<Browser>;
-  abstract _amendEnvironment(env: Env, userDataDir: string, executable: string, browserArguments: string[]): Env;
-  abstract _rewriteStartupError(error: Error): Error;
-  abstract _attemptToGracefullyCloseBrowser(transport: ConnectionTransport): void;
+  abstract defaultArgs(options: types.LaunchOptions, isPersistent: boolean, userDataDir: string): string[];
+  abstract connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<Browser>;
+  abstract amendEnvironment(env: Env, userDataDir: string, executable: string, browserArguments: string[]): Env;
+  abstract rewriteStartupError(error: Error): Error;
+  abstract attemptToGracefullyCloseBrowser(transport: ConnectionTransport): void;
 }
 
 function copyTestHooks(from: object, to: object) {

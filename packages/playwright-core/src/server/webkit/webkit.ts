@@ -31,25 +31,25 @@ export class WebKit extends BrowserType {
     super('webkit', playwrightOptions);
   }
 
-  _connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<WKBrowser> {
+  connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<WKBrowser> {
     return WKBrowser.connect(transport, options);
   }
 
-  _amendEnvironment(env: Env, userDataDir: string, executable: string, browserArguments: string[]): Env {
+  amendEnvironment(env: Env, userDataDir: string, executable: string, browserArguments: string[]): Env {
     return { ...env, CURL_COOKIE_JAR_PATH: path.join(userDataDir, 'cookiejar.db') };
   }
 
-  _rewriteStartupError(error: Error): Error {
+  rewriteStartupError(error: Error): Error {
     if (error.message.includes('cannot open display'))
       return rewriteErrorMessage(error, '\n' + wrapInASCIIBox(kNoXServerRunningError, 1));
     return error;
   }
 
-  _attemptToGracefullyCloseBrowser(transport: ConnectionTransport): void {
+  attemptToGracefullyCloseBrowser(transport: ConnectionTransport): void {
     transport.send({ method: 'Playwright.close', params: {}, id: kBrowserCloseMessageId });
   }
 
-  _defaultArgs(options: types.LaunchOptions, isPersistent: boolean, userDataDir: string): string[] {
+  defaultArgs(options: types.LaunchOptions, isPersistent: boolean, userDataDir: string): string[] {
     const { args = [], proxy, headless } = options;
     const userDataDirArg = args.find(arg => arg.startsWith('--user-data-dir'));
     if (userDataDirArg)
