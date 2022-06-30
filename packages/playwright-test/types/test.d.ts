@@ -2837,13 +2837,6 @@ export interface PlaywrightTestOptions {
  */
 export interface PlaywrightWorkerArgs {
   playwright: typeof import('playwright-core');
-  /**
-   * [Browser] instance is shared between all tests in the [same worker](https://playwright.dev/docs/test-parallel) - this makes testing efficient.
-   * However, each test runs in an isolated [BrowserContext]  and gets a fresh environment.
-   *
-   * Learn how to [configure browser](https://playwright.dev/docs/test-configuration) and see [available options][TestOptions].
-   */
-  browser: Browser;
 }
 
 /**
@@ -2872,6 +2865,13 @@ export interface PlaywrightWorkerArgs {
  * [fixtures.page](https://playwright.dev/docs/api/class-fixtures#fixtures-page).
  */
 export interface PlaywrightTestArgs {
+  /**
+   * [Browser] instance is shared between all tests in the [same worker](https://playwright.dev/docs/test-parallel) - this makes testing efficient.
+   * However, each test runs in an isolated [BrowserContext]  and gets a fresh environment.
+   *
+   * Learn how to [configure browser](https://playwright.dev/docs/test-configuration) and see [available options][TestOptions].
+   */
+  browser: Browser;
   /**
    * Isolated [BrowserContext] instance, created for each test. Since contexts are isolated between each other, every test
    * gets a fresh environment, even when multiple tests run in a single [Browser] for maximum efficiency.

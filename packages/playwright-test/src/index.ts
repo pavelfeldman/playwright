@@ -43,10 +43,10 @@ type TestFixtures = PlaywrightTestArgs & PlaywrightTestOptions & {
   _combinedContextOptions: BrowserContextOptions,
   _setupContextOptionsAndArtifacts: void;
   _contextFactory: (options?: BrowserContextOptions) => Promise<BrowserContext>;
+  _connectedBrowser: Browser | undefined;
+  _browserOptions: LaunchOptions;
 };
 type WorkerFixtures = PlaywrightWorkerArgs & PlaywrightWorkerOptions & {
-  _connectedBrowser: Browser | undefined,
-  _browserOptions: LaunchOptions;
   _artifactsDir: () => string;
   _snapshotSuffix: string;
 };
@@ -102,7 +102,7 @@ export const test = _baseTest.extend<TestFixtures, WorkerFixtures>({
     await use(options);
     for (const browserType of [playwright.chromium, playwright.firefox, playwright.webkit])
       (browserType as any)._defaultLaunchOptions = undefined;
-  }, { scope: 'worker', auto: true }],
+  }, { scope: 'test', auto: true }],
 
   _connectedBrowser: [async ({ playwright, browserName, channel, headless, connectOptions }, use) => {
     if (!connectOptions) {
@@ -121,20 +121,15 @@ export const test = _baseTest.extend<TestFixtures, WorkerFixtures>({
     });
     await use(browser);
     await browser.close();
-  }, { scope: 'worker', timeout: 0, _title: 'remote connection' } as any],
+  }, { scope: 'test', timeout: 0, _title: 'remote connection' } as any],
 
-  browser: [async ({ playwright, browserName, _connectedBrowser }, use) => {
-    if (_connectedBrowser) {
-      await use(_connectedBrowser);
-      return;
-    }
-
+  browser: [async ({ playwright, browserName }, use) => {
     if (!['chromium', 'firefox', 'webkit'].includes(browserName))
       throw new Error(`Unexpected browserName "${browserName}", must be one of "chromium", "firefox" or "webkit"`);
     const browser = await playwright[browserName].launch();
     await use(browser);
     await browser.close();
-  }, { scope: 'worker' } ],
+  }, { scope: 'test' } ],
 
   acceptDownloads: [ true, { option: true } ],
   bypassCSP: [ undefined, { option: true } ],

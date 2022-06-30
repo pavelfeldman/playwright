@@ -25,15 +25,15 @@ import type { RemoteServerOptions } from './remoteServer';
 import { RemoteServer } from './remoteServer';
 
 export type BrowserTestWorkerFixtures = PageWorkerFixtures & {
-  browserVersion: string;
-  defaultSameSiteCookieValue: string;
-  browserMajorVersion: number;
   browserType: BrowserType;
   isAndroid: boolean;
   isElectron: boolean;
 };
 
 type BrowserTestTestFixtures = PageTestFixtures & {
+  browserVersion: string;
+  browserMajorVersion: number;
+  defaultSameSiteCookieValue: string;
   createUserDataDir: () => Promise<string>;
   launchPersistent: (options?: Parameters<BrowserType['launchPersistentContext']>[1]) => Promise<{ context: BrowserContext, page: Page }>;
   startRemoteServer: (options?: RemoteServerOptions) => Promise<RemoteServer>;
@@ -43,7 +43,7 @@ type BrowserTestTestFixtures = PageTestFixtures & {
 const test = baseTest.extend<BrowserTestTestFixtures, BrowserTestWorkerFixtures>({
   browserVersion: [async ({ browser }, run) => {
     await run(browser.version());
-  }, { scope: 'worker' } ],
+  }, { scope: 'test' } ],
 
   browserType: [async ({ playwright, browserName }, run) => {
     await run(playwright[browserName]);
@@ -51,11 +51,11 @@ const test = baseTest.extend<BrowserTestTestFixtures, BrowserTestWorkerFixtures>
 
   defaultSameSiteCookieValue: [async ({ browserName, browserMajorVersion }, run) => {
     await run(browserName === 'chromium' || (browserName === 'firefox' && browserMajorVersion >= 96 && browserMajorVersion < 97) ? 'Lax' : 'None');
-  }, { scope: 'worker' } ],
+  }, { scope: 'test' } ],
 
   browserMajorVersion: [async ({ browserVersion }, run) => {
     await run(Number(browserVersion.split('.')[0]));
-  }, { scope: 'worker' } ],
+  }, { scope: 'test' } ],
 
   isAndroid: [false, { scope: 'worker' } ],
   isElectron: [false, { scope: 'worker' } ],

@@ -238,10 +238,10 @@ export interface PlaywrightTestOptions {
 
 export interface PlaywrightWorkerArgs {
   playwright: typeof import('playwright-core');
-  browser: Browser;
 }
 
 export interface PlaywrightTestArgs {
+  browser: Browser;
   context: BrowserContext;
   page: Page;
   request: APIRequestContext;
