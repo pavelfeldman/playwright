@@ -52,6 +52,7 @@ export type InitializerTraits<T> =
     T extends BrowserTypeChannel ? BrowserTypeInitializer :
     T extends SelectorsChannel ? SelectorsInitializer :
     T extends SocksSupportChannel ? SocksSupportInitializer :
+    T extends TestControllerChannel ? TestControllerInitializer :
     T extends DebugControllerChannel ? DebugControllerInitializer :
     T extends PlaywrightChannel ? PlaywrightInitializer :
     T extends RootChannel ? RootInitializer :
@@ -90,6 +91,7 @@ export type EventsTraits<T> =
     T extends BrowserTypeChannel ? BrowserTypeEvents :
     T extends SelectorsChannel ? SelectorsEvents :
     T extends SocksSupportChannel ? SocksSupportEvents :
+    T extends TestControllerChannel ? TestControllerEvents :
     T extends DebugControllerChannel ? DebugControllerEvents :
     T extends PlaywrightChannel ? PlaywrightEvents :
     T extends RootChannel ? RootEvents :
@@ -128,6 +130,7 @@ export type EventTargetTraits<T> =
     T extends BrowserTypeChannel ? BrowserTypeEventTarget :
     T extends SelectorsChannel ? SelectorsEventTarget :
     T extends SocksSupportChannel ? SocksSupportEventTarget :
+    T extends TestControllerChannel ? TestControllerEventTarget :
     T extends DebugControllerChannel ? DebugControllerEventTarget :
     T extends PlaywrightChannel ? PlaywrightEventTarget :
     T extends RootChannel ? RootEventTarget :
@@ -692,6 +695,21 @@ export interface DebugControllerEvents {
   'sourceChanged': DebugControllerSourceChangedEvent;
   'paused': DebugControllerPausedEvent;
   'browsersChanged': DebugControllerBrowsersChangedEvent;
+}
+
+// ----------- TestController -----------
+export type TestControllerInitializer = {};
+export interface TestControllerEventTarget {
+}
+export interface TestControllerChannel extends TestControllerEventTarget, Channel {
+  _type_TestController: boolean;
+  start(params?: TestControllerStartParams, metadata?: Metadata): Promise<TestControllerStartResult>;
+}
+export type TestControllerStartParams = {};
+export type TestControllerStartOptions = {};
+export type TestControllerStartResult = void;
+
+export interface TestControllerEvents {
 }
 
 // ----------- SocksSupport -----------

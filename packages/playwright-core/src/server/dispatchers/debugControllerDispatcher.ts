@@ -16,10 +16,10 @@
 
 import type * as channels from '@protocol/channels';
 import { DebugController } from '../debugController';
-import type { DispatcherConnection, RootDispatcher } from './dispatcher';
+import type { DispatcherConnection, DispatcherScope, RootDispatcher } from './dispatcher';
 import { Dispatcher } from './dispatcher';
 
-export class DebugControllerDispatcher extends Dispatcher<DebugController, channels.DebugControllerChannel, RootDispatcher> implements channels.DebugControllerChannel {
+export class DebugControllerDispatcher extends Dispatcher<DebugController, channels.DebugControllerChannel, DispatcherScope> implements channels.DebugControllerChannel {
   _type_DebugController;
 
   constructor(connection: DispatcherConnection, debugController: DebugController) {

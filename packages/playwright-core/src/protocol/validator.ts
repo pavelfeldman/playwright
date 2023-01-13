@@ -387,6 +387,9 @@ scheme.DebugControllerKillParams = tOptional(tObject({}));
 scheme.DebugControllerKillResult = tOptional(tObject({}));
 scheme.DebugControllerCloseAllBrowsersParams = tOptional(tObject({}));
 scheme.DebugControllerCloseAllBrowsersResult = tOptional(tObject({}));
+scheme.TestControllerInitializer = tOptional(tObject({}));
+scheme.TestControllerStartParams = tOptional(tObject({}));
+scheme.TestControllerStartResult = tOptional(tObject({}));
 scheme.SocksSupportInitializer = tOptional(tObject({}));
 scheme.SocksSupportSocksRequestedEvent = tObject({
   uid: tString,

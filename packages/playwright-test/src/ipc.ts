@@ -94,7 +94,6 @@ export type TestEntry = {
 export type RunPayload = {
   file: string;
   entries: TestEntry[];
-  watchMode: boolean;
   phase: 'test' | 'projectSetup' | 'globalSetup';
 };
 

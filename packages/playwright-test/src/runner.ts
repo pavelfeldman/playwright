@@ -857,7 +857,6 @@ function createTestGroups(projectSuites: Suite[], workers: number): TestGroup[] 
       repeatEachIndex: test.repeatEachIndex,
       projectId: test._projectId,
       tests: [],
-      watchMode: false,
       phase: test._phase,
     };
   };

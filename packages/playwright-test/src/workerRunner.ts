@@ -175,15 +175,6 @@ export class WorkerRunner extends EventEmitter {
       await this._loadIfNeeded();
       const fileSuite = await this._loader.loadTestFile(runPayload.file, 'worker', runPayload.phase);
       const suite = this._loader.buildFileSuiteForProject(this._project, fileSuite, this._params.repeatEachIndex, test => {
-        if (runPayload.watchMode) {
-          const testResolvedPayload: WatchTestResolvedPayload = {
-            testId: test.id,
-            title: test.title,
-            location: test.location
-          };
-          this.emit('watchTestResolved', testResolvedPayload);
-          entries.set(test.id, { testId: test.id, retry: 0 });
-        }
         if (!entries.has(test.id))
           return false;
         return true;

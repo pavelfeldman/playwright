@@ -44,6 +44,7 @@
     "./lib/utils/timeoutRunner": "./lib/utils/timeoutRunner.js",
     "./lib/remote/playwrightServer": "./lib/remote/playwrightServer.js",
     "./lib/server": "./lib/server/index.js",
+    "./lib/server/dispatchers/dispatcher": "./lib/server/dispatchers/dispatcher.js",
     "./lib/utilsBundle": "./lib/utilsBundle.js",
     "./lib/zipBundle": "./lib/zipBundle.js",
     "./types/protocol": "./types/protocol.d.ts",

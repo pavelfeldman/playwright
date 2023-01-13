@@ -28,6 +28,8 @@ import { createTitleMatcher } from './util';
 import { showHTMLReport } from './reporters/html';
 import { baseFullConfig, defaultTimeout, fileIsModule } from './loader';
 import type { TraceMode } from './types';
+import { TestServer } from './testServer';
+import { createGuid } from 'playwright-core/lib/utils';
 
 export function addTestCommands(program: Command) {
   addTestCommand(program);
@@ -62,6 +64,7 @@ function addTestCommand(program: Command) {
   command.option('--timeout <timeout>', `Specify test timeout threshold in milliseconds, zero for unlimited (default: ${defaultTimeout})`);
   command.option('--trace <mode>', `Force tracing mode, can be ${kTraceModes.map(mode => `"${mode}"`).join(', ')}`);
   command.option('-u, --update-snapshots', `Update snapshots with actual results (default: only create missing snapshots)`);
+  command.option('--watch', `Watch mode`);
   command.option('-x', `Stop after the first failure`);
   command.action(async (args, opts) => {
     try {
@@ -168,6 +171,12 @@ async function runTests(args: string[], opts: { [key: string]: any }) {
   const grepMatcher = opts.grep ? createTitleMatcher(forceRegExp(opts.grep)) : () => true;
   const grepInvertMatcher = opts.grepInvert ? createTitleMatcher(forceRegExp(opts.grepInvert)) : () => false;
   const testTitleMatcher = (title: string) => !grepInvertMatcher(title) && grepMatcher(title);
+
+  if (opts.watch) {
+    const server = new TestServer({ path: '/' + createGuid() });
+    await server.start();
+    return;
+  }
 
   const result = await runner.runAllTests({
     listOnly: !!opts.list,

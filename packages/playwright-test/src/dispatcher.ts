@@ -31,7 +31,6 @@ export type TestGroup = {
   repeatEachIndex: number;
   projectId: string;
   tests: TestCase[];
-  watchMode: boolean;
   phase: 'test' | 'projectSetup' | 'globalSetup';
 };
 
@@ -572,7 +571,6 @@ class Worker extends EventEmitter {
       entries: testGroup.tests.map(test => {
         return { testId: test.id, retry: test.results.length };
       }),
-      watchMode: testGroup.watchMode,
       phase: testGroup.phase,
     };
     this.send({ method: 'run', params: runPayload });

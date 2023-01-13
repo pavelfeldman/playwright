@@ -747,6 +747,12 @@ DebugController:
                       type: array
                       items: string
 
+TestController:
+  type: interface
+
+  commands:
+    start:
+
 SocksSupport:
   type: interface
 
