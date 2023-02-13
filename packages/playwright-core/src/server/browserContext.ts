@@ -77,7 +77,7 @@ export abstract class BrowserContext extends SdkObject {
   private _settingStorageState = false;
   readonly initScripts: string[] = [];
   private _routesInFlight = new Set<network.Route>();
-  private _debugger!: Debugger;
+  private _debugger: Debugger | undefined;
 
   constructor(browser: Browser, options: channels.BrowserNewContextParams, browserContextId: string | undefined) {
     super(browser, 'browser-context');
@@ -136,7 +136,7 @@ export abstract class BrowserContext extends SdkObject {
       await this.grantPermissions(this._options.permissions);
   }
 
-  debugger(): Debugger {
+  debugger(): Debugger | undefined {
     return this._debugger;
   }
 

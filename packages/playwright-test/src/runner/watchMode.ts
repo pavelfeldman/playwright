@@ -24,7 +24,7 @@ import { createTaskRunnerForWatch, createTaskRunnerForWatchSetup } from './tasks
 import type { TaskRunnerState } from './tasks';
 import { buildProjectsClosure, filterProjects } from './projectUtils';
 import { clearCompilationCache, collectAffectedTestFiles } from '../common/compilationCache';
-import type { FullResult } from 'packages/playwright-test/reporter';
+import type { FullResult, Reporter } from 'packages/playwright-test/reporter';
 import { chokidar } from '../utilsBundle';
 import type { FSWatcher as CFSWatcher } from 'chokidar';
 import { createReporter } from './reporters';
@@ -33,6 +33,8 @@ import { enquirer } from '../utilsBundle';
 import { separator } from '../reporters/base';
 import { PlaywrightServer } from 'playwright-core/lib/remote/playwrightServer';
 import ListReporter from '../reporters/list';
+import { showTraceViewer } from 'playwright-core/lib/server/trace/viewer/traceViewer';
+import { TeleReporterEmitter } from '../reporters/teleEmitter';
 
 class FSWatcher {
   private _dirtyTestFiles = new Map<FullProjectInternal, Set<string>>();
@@ -113,6 +115,10 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
   for (const p of config.projects)
     p.retries = 0;
 
+  // Show trace viewer.
+  const { controller } = await showTraceViewer([], 'chromium', { watchMode: true });
+  const watchReporter = new TeleReporterEmitter(controller!.send.bind(controller));
+
   // Perform global setup.
   const reporter = await createReporter(config, 'watch');
   const context: TaskRunnerState = {
@@ -135,9 +141,10 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
   let lastRun: { type: 'changed' | 'regular' | 'failed', failedTestIds?: Set<string>, dirtyTestFiles?: Map<FullProjectInternal, Set<string>> } = { type: 'regular' };
   let result: FullResult['status'] = 'passed';
 
-  // Enter the watch loop.
-  await runTests(config, failedTestIdCollector);
+  // Initial run.
+  await runTests(config, failedTestIdCollector, watchReporter);
 
+  // Enter the watch loop.
   while (true) {
     printPrompt();
     const readCommandPromise = readCommand();
@@ -153,14 +160,14 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
     if (command === 'changed') {
       const dirtyTestFiles = fsWatcher.takeDirtyTestFiles();
       // Resolve files that depend on the changed files.
-      await runChangedTests(config, failedTestIdCollector, dirtyTestFiles);
+      await runChangedTests(config, failedTestIdCollector, watchReporter, dirtyTestFiles);
       lastRun = { type: 'changed', dirtyTestFiles };
       continue;
     }
 
     if (command === 'run') {
       // All means reset filters.
-      await runTests(config, failedTestIdCollector);
+      await runTests(config, failedTestIdCollector, watchReporter);
       lastRun = { type: 'regular' };
       continue;
     }
@@ -176,7 +183,7 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
         continue;
       config._internal.cliProjectFilter = projectNames.length ? projectNames : undefined;
       await fsWatcher.update(config);
-      await runTests(config, failedTestIdCollector);
+      await runTests(config, failedTestIdCollector, watchReporter);
       lastRun = { type: 'regular' };
       continue;
     }
@@ -194,7 +201,7 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
       else
         config._internal.cliArgs = [];
       await fsWatcher.update(config);
-      await runTests(config, failedTestIdCollector);
+      await runTests(config, failedTestIdCollector, watchReporter);
       lastRun = { type: 'regular' };
       continue;
     }
@@ -212,7 +219,7 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
       else
         config._internal.cliGrep = undefined;
       await fsWatcher.update(config);
-      await runTests(config, failedTestIdCollector);
+      await runTests(config, failedTestIdCollector, watchReporter);
       lastRun = { type: 'regular' };
       continue;
     }
@@ -220,7 +227,7 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
     if (command === 'failed') {
       config._internal.testIdMatcher = id => failedTestIdCollector.has(id);
       const failedTestIds = new Set(failedTestIdCollector);
-      await runTests(config, failedTestIdCollector, { title: 'running failed tests' });
+      await runTests(config, failedTestIdCollector, watchReporter, { title: 'running failed tests' });
       config._internal.testIdMatcher = undefined;
       lastRun = { type: 'failed', failedTestIds };
       continue;
@@ -228,13 +235,13 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
 
     if (command === 'repeat') {
       if (lastRun.type === 'regular') {
-        await runTests(config, failedTestIdCollector, { title: 're-running tests' });
+        await runTests(config, failedTestIdCollector, watchReporter, { title: 're-running tests' });
         continue;
       } else if (lastRun.type === 'changed') {
-        await runChangedTests(config, failedTestIdCollector, lastRun.dirtyTestFiles!, 're-running tests');
+        await runChangedTests(config, failedTestIdCollector, watchReporter, lastRun.dirtyTestFiles!, 're-running tests');
       } else if (lastRun.type === 'failed') {
         config._internal.testIdMatcher = id => lastRun.failedTestIds!.has(id);
-        await runTests(config, failedTestIdCollector, { title: 're-running tests' });
+        await runTests(config, failedTestIdCollector, watchReporter, { title: 're-running tests' });
         config._internal.testIdMatcher = undefined;
       }
       continue;
@@ -257,7 +264,7 @@ export async function runWatchModeLoop(config: FullConfigInternal): Promise<Full
   return result === 'passed' ? await globalCleanup() : result;
 }
 
-async function runChangedTests(config: FullConfigInternal, failedTestIdCollector: Set<string>, filesByProject: Map<FullProjectInternal, Set<string>>, title?: string) {
+async function runChangedTests(config: FullConfigInternal, failedTestIdCollector: Set<string>, guiReporter: Reporter, filesByProject: Map<FullProjectInternal, Set<string>>, title?: string) {
   const testFiles = new Set<string>();
   for (const files of filesByProject.values())
     files.forEach(f => testFiles.add(f));
@@ -273,16 +280,16 @@ async function runChangedTests(config: FullConfigInternal, failedTestIdCollector
   // If there are affected dependency projects, do the full run, respect the original CLI.
   // if there are no affected dependency projects, intersect CLI with dirty files
   const additionalFileMatcher = affectsAnyDependency ? () => true : (file: string) => testFiles.has(file);
-  await runTests(config, failedTestIdCollector, { projectsToIgnore, additionalFileMatcher, title: title || 'files changed' });
+  await runTests(config, failedTestIdCollector, guiReporter, { projectsToIgnore, additionalFileMatcher, title: title || 'files changed' });
 }
 
-async function runTests(config: FullConfigInternal, failedTestIdCollector: Set<string>, options?: {
+async function runTests(config: FullConfigInternal, failedTestIdCollector: Set<string>, guiReporter: Reporter, options?: {
     projectsToIgnore?: Set<FullProjectInternal>,
     additionalFileMatcher?: Matcher,
     title?: string,
   }) {
   printConfiguration(config, options?.title);
-  const reporter = new Multiplexer([new ListReporter()]);
+  const reporter = new Multiplexer([new ListReporter(), guiReporter]);
   const taskRunner = createTaskRunnerForWatch(config, reporter, options?.projectsToIgnore, options?.additionalFileMatcher);
   const context: TaskRunnerState = {
     config,

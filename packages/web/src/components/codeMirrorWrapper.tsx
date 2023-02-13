@@ -40,6 +40,7 @@ export interface SourceProps {
   focusOnChange?: boolean;
   wrapLines?: boolean;
   onChange?: (text: string) => void;
+  maxWidth?: number;
 }
 
 export const CodeMirrorWrapper: React.FC<SourceProps> = ({
@@ -52,6 +53,7 @@ export const CodeMirrorWrapper: React.FC<SourceProps> = ({
   focusOnChange,
   wrapLines,
   onChange,
+  maxWidth,
 }) => {
   const codemirrorElement = React.createRef<HTMLDivElement>();
   const [codemirror, setCodemirror] = React.useState<CodeMirror.Editor>();
@@ -91,7 +93,8 @@ export const CodeMirrorWrapper: React.FC<SourceProps> = ({
   if (codemirror)
     updateEditor(codemirror, text, highlight, revealLine, focusOnChange);
 
-  return <div className='cm-wrapper' ref={codemirrorElement}></div>;
+  const style = maxWidth ? { maxWidth, lineHeight: '22px' } : {};
+  return <div className='cm-wrapper' ref={codemirrorElement} style={style}></div>;
 };
 
 function updateEditor(cm: CodeMirror.Editor, text: string, highlight: SourceHighlight[], revealLine?: number, focusOnChange?: boolean) {

@@ -20,10 +20,17 @@ import * as React from 'react';
 import { useMeasure } from './helpers';
 import type { ActionTraceEvent } from '@trace/trace';
 import { context } from './modelUtil';
+import { CodeMirrorWrapper } from '@web/components/codeMirrorWrapper';
+import { Toolbar } from '@web/components/toolbar';
+import { ToolbarButton } from '@web/components/toolbarButton';
+import { copy } from '@web/uiUtils';
 
 export const SnapshotTab: React.FunctionComponent<{
   action: ActionTraceEvent | undefined,
-}> = ({ action }) => {
+  locator: string,
+  setLocator: (locator: string) => void,
+}> = ({ action, locator, setLocator }) => {
+  const [mode, setMode] = React.useState('none');
   const [measure, ref] = useMeasure<HTMLDivElement>();
   const [snapshotIndex, setSnapshotIndex] = React.useState(0);
 
@@ -102,7 +109,26 @@ export const SnapshotTab: React.FunctionComponent<{
       if (event.key === 'ArrowLeft')
         setSnapshotIndex(Math.max(snapshotIndex - 1, 0));
     }}
-  ><div className='tab-strip'>
+  >
+    <Toolbar>
+      <ToolbarButton icon='microscope' title='Pick locator' toggled={mode === 'inspecting'} onClick={() => {
+        console.log('PICL CLICKED')
+        setMode(mode === 'inspecting' ? 'none' : 'inspecting');
+        (window as any).binding({ method: 'setMode', params: { mode: mode === 'inspecting' ? 'none' : 'inspecting' } });
+      }}>Pick locator</ToolbarButton>
+      <CodeMirrorWrapper text={locator} language='javascript' readOnly={false} focusOnChange={true} wrapLines={false} maxWidth={200} onChange={text => {
+        setLocator(text);
+        (window as any).binding({ method: 'setLocator', params: { locator: text } });
+      }}></CodeMirrorWrapper>
+      <ToolbarButton icon='files' title='Copy' onClick={() => {
+        copy(locator);
+      }}></ToolbarButton>
+      <div style={{ flex: 'auto' }}></div>
+      <ToolbarButton icon='link-external' title='Pop out' onClick={() => {
+        window.open(popoutUrl || '', '_blank');
+      }}></ToolbarButton>
+    </Toolbar>
+    <div className='tab-strip'>
       {snapshots.map((snapshot, index) => {
         return <div className={'tab-element ' + (snapshotIndex === index ? ' selected' : '')}
           onClick={() => setSnapshotIndex(index)}
@@ -112,9 +138,6 @@ export const SnapshotTab: React.FunctionComponent<{
       })}
     </div>
     <div ref={ref} className='snapshot-wrapper'>
-      <a className={`popout-icon ${popoutUrl ? '' : 'popout-disabled'}`} href={popoutUrl} target='_blank' title='Open snapshot in a new tab'>
-        <span className='codicon codicon-link-external'/>
-      </a>
       { snapshots.length ? <div className='snapshot-container' style={{
         width: snapshotContainerSize.width + 'px',
         height: snapshotContainerSize.height + 'px',

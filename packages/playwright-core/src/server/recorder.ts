@@ -55,7 +55,7 @@ export class Recorder implements InstrumentationListener {
   private _currentCallsMetadata = new Map<CallMetadata, SdkObject>();
   private _recorderSources: Source[] = [];
   private _userSources = new Map<string, Source>();
-  private _debugger: Debugger;
+  private _debugger: Debugger | undefined;
   private _contextRecorder: ContextRecorder;
   private _handleSIGINT: boolean | undefined;
   private _omitCallTracking = false;
@@ -101,8 +101,11 @@ export class Recorder implements InstrumentationListener {
   async install() {
     const recorderApp = await (Recorder.recorderAppFactory || Recorder.defaultRecorderAppFactory)(this);
     this._recorderApp = recorderApp;
+    const debuggerInstance = this._debugger;
+    if (!debuggerInstance)
+      return;
     recorderApp.once('close', () => {
-      this._debugger.resume(false);
+      debuggerInstance.resume(false);
       this._recorderApp = null;
     });
     recorderApp.on('event', (data: EventData) => {
@@ -115,7 +118,7 @@ export class Recorder implements InstrumentationListener {
         return;
       }
       if (data.event === 'step') {
-        this._debugger.resume(true);
+        debuggerInstance.resume(true);
         return;
       }
       if (data.event === 'fileChanged') {
@@ -124,11 +127,11 @@ export class Recorder implements InstrumentationListener {
         return;
       }
       if (data.event === 'resume') {
-        this._debugger.resume(false);
+        debuggerInstance.resume(false);
         return;
       }
       if (data.event === 'pause') {
-        this._debugger.pauseOnNextStatement();
+        debuggerInstance.pauseOnNextStatement();
         return;
       }
       if (data.event === 'clear') {
@@ -139,7 +142,7 @@ export class Recorder implements InstrumentationListener {
 
     await Promise.all([
       recorderApp.setMode(this._mode),
-      recorderApp.setPaused(this._debugger.isPaused()),
+      recorderApp.setPaused(debuggerInstance.isPaused()),
       this._pushAllSources()
     ]);
 
@@ -182,26 +185,26 @@ export class Recorder implements InstrumentationListener {
     });
 
     await this._context.exposeBinding('__pw_resume', false, () => {
-      this._debugger.resume(false);
+      debuggerInstance.resume(false);
     });
     await this._context.extendInjectedScript(consoleApiSource.source);
 
     await this._contextRecorder.install();
 
-    if (this._debugger.isPaused())
+    if (debuggerInstance.isPaused())
       this._pausedStateChanged();
-    this._debugger.on(Debugger.Events.PausedStateChanged, () => this._pausedStateChanged());
+      debuggerInstance.on(Debugger.Events.PausedStateChanged, () => this._pausedStateChanged());
 
     (this._context as any).recorderAppForTest = recorderApp;
   }
 
   _pausedStateChanged() {
     // If we are called upon page.pause, we don't have metadatas, populate them.
-    for (const { metadata, sdkObject } of this._debugger.pausedDetails()) {
+    for (const { metadata, sdkObject } of this._debugger!.pausedDetails()) {
       if (!this._currentCallsMetadata.has(metadata))
         this.onBeforeCall(sdkObject, metadata);
     }
-    this._recorderApp?.setPaused(this._debugger.isPaused());
+    this._recorderApp?.setPaused(this._debugger!.isPaused());
     this._updateUserSources();
     this.updateCallLog([...this._currentCallsMetadata.keys()]);
   }
@@ -213,14 +216,14 @@ export class Recorder implements InstrumentationListener {
     this._mode = mode;
     this._recorderApp?.setMode(this._mode);
     this._contextRecorder.setEnabled(this._mode === 'recording');
-    this._debugger.setMuted(this._mode === 'recording');
+    this._debugger?.setMuted(this._mode === 'recording');
     if (this._mode !== 'none' && this._context.pages().length === 1)
       this._context.pages()[0].bringToFront().catch(() => {});
     this._refreshOverlay();
   }
 
   resume() {
-    this._debugger.resume(false);
+    this._debugger?.resume(false);
   }
 
   setHighlightedSelector(language: Language, selector: string) {
@@ -284,7 +287,7 @@ export class Recorder implements InstrumentationListener {
         this._userSources.set(file, source);
       }
       if (line) {
-        const paused = this._debugger.isPaused(metadata);
+        const paused = this._debugger?.isPaused(metadata);
         source.highlight.push({ line, type: metadata.error ? 'error' : (paused ? 'paused' : 'running') });
         source.revealLine = line;
         fileToSelect = source.id;
@@ -316,7 +319,7 @@ export class Recorder implements InstrumentationListener {
       let status: CallLogStatus = 'done';
       if (this._currentCallsMetadata.has(metadata))
         status = 'in-progress';
-      if (this._debugger.isPaused(metadata))
+      if (this._debugger?.isPaused(metadata))
         status = 'paused';
       logs.push(metadataToCallLog(metadata, status));
     }

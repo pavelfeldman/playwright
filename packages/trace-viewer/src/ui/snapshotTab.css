@@ -150,3 +150,7 @@ iframe#snapshot {
 body.dark-mode .window-header {
   background: #444950;
 }
+
+.snapshot-tab .tab-strip {
+  border-top: 1px solid var(--vscode-panel-border);
+}

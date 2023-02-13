@@ -137,7 +137,7 @@ export const WorkbenchLoader: React.FunctionComponent<{
       <div className='spacer'></div>
       <ToolbarButton icon='color-mode' title='Toggle color mode' toggled={false} onClick={() => toggleTheme()}></ToolbarButton>
     </div>
-    <Workbench model={model} view='standalone'></Workbench>
+    <Workbench model={model} view='standalone' locator='' setLocator={() => {}}></Workbench>
     {!!progress.total && <div className='progress'>
       <div className='inner-progress' style={{ width: (100 * progress.done / progress.total) + '%' }}></div>
     </div>}
@@ -172,8 +172,10 @@ export const WorkbenchLoader: React.FunctionComponent<{
 
 export const Workbench: React.FunctionComponent<{
   model: MultiTraceModel,
-  view: 'embedded' | 'standalone'
-}> = ({ model, view }) => {
+  view: 'embedded' | 'standalone',
+  locator: string,
+  setLocator: (locator: string) => void,
+}> = ({ model, view, locator, setLocator }) => {
   const [selectedAction, setSelectedAction] = React.useState<ActionTraceEvent | undefined>();
   const [highlightedAction, setHighlightedAction] = React.useState<ActionTraceEvent | undefined>();
   const [selectedNavigatorTab, setSelectedNavigatorTab] = React.useState<string>('actions');
@@ -208,7 +210,7 @@ export const Workbench: React.FunctionComponent<{
     </div>
     <SplitView sidebarSize={300} orientation='horizontal' sidebarIsFirst={true}>
       <SplitView sidebarSize={300} orientation={view === 'embedded' ? 'vertical' : 'horizontal'}>
-        <SnapshotTab action={activeAction} />
+        <SnapshotTab action={activeAction} locator={locator} setLocator={setLocator}/>
         <TabbedPane tabs={tabs} selectedTab={selectedPropertiesTab} setSelectedTab={setSelectedPropertiesTab}/>
       </SplitView>
       <TabbedPane tabs={

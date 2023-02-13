@@ -61,6 +61,8 @@ class Recorder {
   }
 
   private _refreshListenersIfNeeded() {
+    if ((window as any).noRecorder)
+      return;
     // Ensure we are attached to the current document, and we are on top (last element);
     if (this._highlight.isInstalled())
       return;
