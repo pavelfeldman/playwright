@@ -42,6 +42,7 @@
 }
 
 .split-view-sidebar {
+  background-color: var(--vscode-sideBar-background);
   display: flex;
   flex: none;
 }

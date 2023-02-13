@@ -21,6 +21,7 @@
   align-items: stretch;
   outline: none;
   --window-header-height: 40px;
+  overflow: hidden;
 }
 
 .snapshot-controls {

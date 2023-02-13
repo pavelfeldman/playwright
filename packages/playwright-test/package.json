@@ -23,6 +23,7 @@
     "./lib/mount": "./lib/mount.js",
     "./lib/plugins": "./lib/plugins/index.js",
     "./lib/plugins/vitePlugin": "./lib/plugins/vitePlugin.js",
+    "./lib/reporters/teleReceiver": "./lib/reporters/teleReceiver.js",
     "./reporter": "./reporter.js"
   },
   "bin": {

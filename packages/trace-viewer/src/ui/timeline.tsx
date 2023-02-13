@@ -41,10 +41,9 @@ export const Timeline: React.FunctionComponent<{
   context: MultiTraceModel,
   boundaries: Boundaries,
   selectedAction: ActionTraceEvent | undefined,
-  highlightedAction: ActionTraceEvent | undefined,
   onSelected: (action: ActionTraceEvent) => void,
   onHighlighted: (action: ActionTraceEvent | undefined) => void,
-}> = ({ context, boundaries, selectedAction, highlightedAction, onSelected, onHighlighted }) => {
+}> = ({ context, boundaries, selectedAction, onSelected, onHighlighted }) => {
   const [measure, ref] = useMeasure<HTMLDivElement>();
   const barsRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -92,7 +91,7 @@ export const Timeline: React.FunctionComponent<{
   }, [context, boundaries, measure.width]);
 
   const hoveredBar = hoveredBarIndex !== undefined ? bars[hoveredBarIndex] : undefined;
-  let targetBar: TimelineBar | undefined = bars.find(bar => bar.action === (highlightedAction || selectedAction));
+  let targetBar: TimelineBar | undefined = bars.find(bar => bar.action === selectedAction);
   targetBar = hoveredBar || targetBar;
 
   const findHoveredBarIndex = (x: number, y: number) => {

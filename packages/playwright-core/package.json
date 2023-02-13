@@ -28,6 +28,7 @@
     "./lib/containers/docker": "./lib/containers/docker.js",
     "./lib/remote/playwrightServer": "./lib/remote/playwrightServer.js",
     "./lib/server": "./lib/server/index.js",
+    "./lib/server/trace/viewer/traceViewer": "./lib/server/trace/viewer/traceViewer.js",
     "./lib/utils": "./lib/utils/index.js",
     "./lib/utilsBundle": "./lib/utilsBundle.js",
     "./lib/zipBundle": "./lib/zipBundle.js",
