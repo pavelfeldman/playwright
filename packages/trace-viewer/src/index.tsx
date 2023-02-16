@@ -30,7 +30,6 @@ let rootSuite: Suite | undefined;
 
 let updateList: () => void = () => {};
 let updateProgress: () => void = () => {};
-let updateLocator: (locator: string) => void = () => {};
 
 export const RootView: React.FC<{}> = ({
 }) => {
@@ -133,8 +132,6 @@ export const TraceView: React.FC<{
   isRunningTest: boolean,
 }> = ({ test, isRunningTest }) => {
   const [model, setModel] = React.useState<MultiTraceModel | undefined>();
-  const [locator, setLocator] = React.useState<string>('');
-  updateLocator = setLocator;
 
   React.useEffect(() => {
     (async () => {
@@ -168,7 +165,7 @@ export const TraceView: React.FC<{
     </div>;
   }
 
-  return <Workbench model={model} view='embedded' locator={locator} setLocator={setLocator}></Workbench>;
+  return <Workbench model={model} view='embedded'></Workbench>;
 
 };
 
@@ -206,9 +203,6 @@ const receiver = new TeleReporterReceiver({
 
 
 (window as any).dispatch = (message: any) => {
-  if (message?.method === 'setLocator') {
-    updateLocator(message.params.locator);
-  }
   receiver.dispatch(message);
 };
 

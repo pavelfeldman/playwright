@@ -154,3 +154,7 @@ body.dark-mode .window-header {
 .snapshot-tab .tab-strip {
   border-top: 1px solid var(--vscode-panel-border);
 }
+
+.toolbar-button.toggled.microscope {
+  color: #12a3ff;
+}

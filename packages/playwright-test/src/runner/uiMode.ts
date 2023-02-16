@@ -55,11 +55,11 @@ export async function runUIMode(config: FullConfigInternal): Promise<FullResult[
   const { page } = await showTraceViewer([], 'chromium', { watchMode: true });
   await page.mainFrame().evaluateExpression('window.noRecorder = true', false, undefined, 'main');
   Recorder.setAppFactory(async () => new InspectingRecorderApp(page));
-  const recorder = await Recorder.show(page.context(), { omitCallTracking: true });
+  // const recorder = await Recorder.show(page.context(), { omitCallTracking: true });
 
   {
     // List
-    const controller = new Controller(config, page, recorder);
+    const controller = new Controller(config, page);
     const listReporter = new TeleReporterEmitter(message => controller!.send(message));
     const reporter = new Multiplexer([listReporter]);
     const taskRunner = createTaskRunnerForList(config, reporter);
@@ -86,7 +86,7 @@ class Controller {
   private _queue = Promise.resolve();
   private _runReporter: TeleReporterEmitter;
 
-  constructor(config: FullConfigInternal, page: Page, recorder: Recorder) {
+  constructor(config: FullConfigInternal, page: Page) {
     this._page = page;
     this._runReporter = new TeleReporterEmitter(message => this!.send(message));
     this._page.exposeBinding('binding', false, (source, data) => {
@@ -97,14 +97,14 @@ class Controller {
         this._queue = this._queue.then(() => runTests(config, this._runReporter));
         return this._queue;
       }
-      if (method === 'setMode') {
-        // console.log('SET MODE', params);
-        recorder.setMode(params.mode);
-      }
-      if (method === 'setLocator') {
-        // console.log('SET LOCATOR', params);
-        recorder.setMode('none');
-      }
+      // if (method === 'setMode') {
+      //   // console.log('SET MODE', params);
+      //   recorder.setMode(params.mode);
+      // }
+      // if (method === 'setLocator') {
+      //   // console.log('SET LOCATOR', params);
+      //   recorder.setMode('none');
+      // }
     });
   }
 

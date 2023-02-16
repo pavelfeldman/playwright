@@ -193,7 +193,7 @@ export class Recorder implements InstrumentationListener {
 
     if (debuggerInstance.isPaused())
       this._pausedStateChanged();
-      debuggerInstance.on(Debugger.Events.PausedStateChanged, () => this._pausedStateChanged());
+    debuggerInstance.on(Debugger.Events.PausedStateChanged, () => this._pausedStateChanged());
 
     (this._context as any).recorderAppForTest = recorderApp;
   }

@@ -24,15 +24,19 @@ import { CodeMirrorWrapper } from '@web/components/codeMirrorWrapper';
 import { Toolbar } from '@web/components/toolbar';
 import { ToolbarButton } from '@web/components/toolbarButton';
 import { copy } from '@web/uiUtils';
+import { InjectedScript } from '@injected/injectedScript';
+import { Recorder  } from '@injected/recorder';
+import { asLocator } from '@isomorphic/locatorGenerators';
+import type { Language } from '@isomorphic/locatorGenerators';
+import { locatorOrSelectorAsSelector } from '@isomorphic/locatorParser';
 
 export const SnapshotTab: React.FunctionComponent<{
   action: ActionTraceEvent | undefined,
-  locator: string,
-  setLocator: (locator: string) => void,
-}> = ({ action, locator, setLocator }) => {
-  const [mode, setMode] = React.useState('none');
+}> = ({ action }) => {
+  const [mode, setMode] = React.useState<'none' | 'inspecting'>('none');
   const [measure, ref] = useMeasure<HTMLDivElement>();
   const [snapshotIndex, setSnapshotIndex] = React.useState(0);
+  const [locator, setLocator] = React.useState<string>('');
 
   const snapshotMap = new Map<string, { title: string, snapshotName: string }>();
   for (const snapshot of action?.metadata.snapshots || [])
@@ -100,6 +104,16 @@ export const SnapshotTab: React.FunctionComponent<{
     x: (measure.width - snapshotContainerSize.width) / 2,
     y: (measure.height - snapshotContainerSize.height) / 2,
   };
+
+  const recorderGetter = () => {
+    if (!iframeRef.current)
+      return;
+    return getOrCreateRecorder(iframeRef.current.contentWindow!, true, 'javascript', locator => {
+      setLocator(locator);
+      setMode('none');
+    });
+  };
+
   return <div
     className='snapshot-tab'
     tabIndex={0}
@@ -112,13 +126,15 @@ export const SnapshotTab: React.FunctionComponent<{
   >
     <Toolbar>
       <ToolbarButton icon='microscope' title='Pick locator' toggled={mode === 'inspecting'} onClick={() => {
-        console.log('PICL CLICKED')
         setMode(mode === 'inspecting' ? 'none' : 'inspecting');
-        (window as any).binding({ method: 'setMode', params: { mode: mode === 'inspecting' ? 'none' : 'inspecting' } });
+        const recorder = recorderGetter();
+        recorder?.setUIState({ mode: mode === 'inspecting' ? 'none' : 'inspecting', language: 'javascript', testIdAttributeName });
       }}>Pick locator</ToolbarButton>
       <CodeMirrorWrapper text={locator} language='javascript' readOnly={false} focusOnChange={true} wrapLines={false} maxWidth={200} onChange={text => {
+        const recorder = recorderGetter();
+        const actionSelector = locatorOrSelectorAsSelector('javascript', text, testIdAttributeName);
+        recorder?.setUIState({ mode: mode === 'inspecting' ? 'none' : 'inspecting', language: 'javascript', testIdAttributeName, actionSelector });
         setLocator(text);
-        (window as any).binding({ method: 'setLocator', params: { locator: text } });
       }}></CodeMirrorWrapper>
       <ToolbarButton icon='files' title='Copy' onClick={() => {
         copy(locator);
@@ -164,6 +180,32 @@ export const SnapshotTab: React.FunctionComponent<{
     </div>
   </div>;
 };
+
+const testIdAttributeName = 'data-testid';
+
+function getOrCreateRecorder(contentWindow: Window, enabled: boolean, language: Language, setLocator: (locator: string) => void): Recorder | undefined {
+  const win = contentWindow as any;
+  if (!enabled && !win._recorder)
+    return;
+  let recorder: Recorder | undefined = win._recorder;
+
+  if (!recorder) {
+    const injectedScript = new InjectedScript(contentWindow as any, false, language, testIdAttributeName, 1, 'chromium', []);
+    recorder = new Recorder(injectedScript, {
+      async setSelector(selector: string) {
+        recorder!.setUIState({ mode: 'none', language, testIdAttributeName });
+        setLocator(asLocator('javascript', selector, false));
+      }
+    });
+    win._recorder = recorder;
+  }
+  return recorder;
+}
+
+function togglePickLocator(contentWindow: Window, enabled: boolean, language: Language, setLocator: (locator: string) => void) {
+  const recorder = getOrCreateRecorder(contentWindow, enabled, language, setLocator);
+  recorder?.setUIState({ mode: enabled ? 'inspecting' : 'none', language, testIdAttributeName });
+}
 
 function renderTitle(snapshotTitle: string): string {
   if (snapshotTitle === 'before')
