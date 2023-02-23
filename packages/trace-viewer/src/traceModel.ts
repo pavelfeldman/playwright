@@ -54,6 +54,7 @@ export class TraceModel {
     let traceEntry: zip.Entry | undefined;
     let networkEntry: zip.Entry | undefined;
     let stacksEntry: zip.Entry | undefined;
+    let stepsEntry: zip.Entry | undefined;
     for (const entry of await this._zipReader.getEntries({ onprogress: progress })) {
       if (entry.filename.endsWith('.trace'))
         traceEntry = entry;
@@ -61,6 +62,8 @@ export class TraceModel {
         networkEntry = entry;
       if (entry.filename.endsWith('.stacks'))
         stacksEntry = entry;
+      if (entry.filename.endsWith('.steps'))
+        stepsEntry = entry;
       if (entry.filename.includes('src@'))
         this.contextEntry.hasSource = true;
       this._entries.set(entry.filename, entry);
@@ -74,6 +77,13 @@ export class TraceModel {
     await traceEntry.getData!(traceWriter);
     for (const line of (await traceWriter.getData()).split('\n'))
       this.appendEvent(line);
+
+    if (stepsEntry) {
+      const writer = new zipjs.TextWriter() as zip.TextWriter;
+      await stepsEntry.getData!(writer);
+      for (const line of (await writer.getData()).split('\n'))
+        this.appendEvent(line);
+    }
 
     if (networkEntry) {
       const networkWriter = new zipjs.TextWriter();

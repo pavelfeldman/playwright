@@ -23,6 +23,7 @@ import type { TestCase } from '../common/test';
 import { TimeoutManager } from './timeoutManager';
 import type { Annotation, FullConfigInternal, FullProjectInternal, Location } from '../common/types';
 import { getContainedPath, normalizeAndSaveAttachment, sanitizeForFilePath, serializeError, trimLongString } from '../util';
+import type * as trace from '@trace/trace';
 
 export type TestInfoErrorState = {
   status: TestStatus,
@@ -48,6 +49,7 @@ export class TestInfoImpl implements TestInfo {
   readonly _startTime: number;
   readonly _startWallTime: number;
   private _hasHardError: boolean = false;
+  readonly _traceEvents: trace.TraceEvent[] = [];
   readonly _onTestFailureImmediateCallbacks = new Map<() => Promise<void>, string>(); // fn -> title
   _didTimeout = false;
   _lastStepId = 0;
@@ -208,6 +210,29 @@ export class TestInfoImpl implements TestInfo {
     const stepId = `${data.category}@${data.title}@${++this._lastStepId}`;
     let callbackHandled = false;
     const firstErrorIndex = this.errors.length;
+    const wallTime = Date.now();
+    const stackFrame = data.location ? {
+      file: data.location.file,
+      line: data.location.line,
+      column: data.location.column,
+    } : undefined;
+    const traceEvent: trace.ActionTraceEvent = {
+      type: 'action',
+      metadata: {
+        id: stepId,
+        wallTime,
+        startTime: monotonicTime(),
+        endTime: 0,
+        type: 'Test',
+        method: 'step',
+        apiName: data.title,
+        params: {},
+        snapshots: [],
+        log: [],
+        stack: stackFrame ? [stackFrame] : undefined,
+      },
+    };
+    this._traceEvents.push(traceEvent);
     const step: TestStepInternal = {
       ...data,
       complete: result => {
@@ -233,6 +258,8 @@ export class TestInfoImpl implements TestInfo {
           wallTime: Date.now(),
           error,
         };
+        traceEvent.metadata.endTime = monotonicTime();
+        traceEvent.metadata.error = { error: { message: '', name: '', ...error } };
         this._onStepEnd(payload);
       }
     };
@@ -244,7 +271,7 @@ export class TestInfoImpl implements TestInfo {
       stepId,
       ...data,
       location,
-      wallTime: Date.now(),
+      wallTime,
     };
     this._onStepBegin(payload);
     return step;

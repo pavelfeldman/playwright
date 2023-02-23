@@ -507,6 +507,9 @@ LocalUtils:
           type: array
           items: ClientSideCallMetadata
         includeSources: boolean
+        additionalEvents:
+          type: array?
+          items: json
 
     harOpen:
       parameters:

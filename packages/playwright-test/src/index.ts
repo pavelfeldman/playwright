@@ -305,6 +305,12 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
       (context as any)._instrumentation.addListener(createInstrumentationListener());
     };
 
+
+    const stopChunk = async (tracing: Tracing, path: string) => {
+      const additionalEvents = (testInfo as any)._traceEvents;
+      await (tracing as any).stopChunk({ path, additionalEvents });
+    };
+
     const startedCollectingArtifacts = Symbol('startedCollectingArtifacts');
     const stopTraceChunkOnContextClosure = async (tracing: Tracing) => {
       (tracing as any)[startedCollectingArtifacts] = true;
@@ -313,7 +319,7 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
         // after the test finishes.
         const tracePath = path.join(_artifactsDir(), createGuid() + '.zip');
         temporaryTraceFiles.push(tracePath);
-        await tracing.stopChunk({ path: tracePath });
+        await stopChunk(tracing, tracePath);
       }
     };
 
@@ -421,7 +427,7 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
       if ((tracing as any)[startedCollectingArtifacts])
         return;
       if (preserveTrace)
-        await tracing.stopChunk({ path: addTraceAttachment() });
+        await stopChunk(tracing, addTraceAttachment());
       else if (captureTrace)
         await tracing.stopChunk();
     };

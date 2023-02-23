@@ -222,6 +222,7 @@ scheme.LocalUtilsZipParams = tObject({
   mode: tEnum(['write', 'append']),
   metadata: tArray(tType('ClientSideCallMetadata')),
   includeSources: tBoolean,
+  additionalEvents: tOptional(tArray(tAny)),
 });
 scheme.LocalUtilsZipResult = tOptional(tObject({}));
 scheme.LocalUtilsHarOpenParams = tObject({

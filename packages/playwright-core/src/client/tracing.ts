@@ -18,6 +18,7 @@ import type * as api from '../../types/types';
 import type * as channels from '@protocol/channels';
 import { Artifact } from './artifact';
 import { ChannelOwner } from './channelOwner';
+import type { ActionTraceEvent } from '@trace/trace';
 
 export class Tracing extends ChannelOwner<channels.TracingChannel> implements api.Tracing {
   private _includeSources = false;
@@ -46,8 +47,8 @@ export class Tracing extends ChannelOwner<channels.TracingChannel> implements ap
     this._connection.startCollectingCallMetadata(this._metadataCollector);
   }
 
-  async stopChunk(options: { path?: string } = {}) {
-    await this._doStopChunk(options.path);
+  async stopChunk(options: { path?: string, additionalEvents?: ActionTraceEvent[] } = {}) {
+    await this._doStopChunk(options.path, options.additionalEvents);
   }
 
   async stop(options: { path?: string } = {}) {
@@ -57,7 +58,7 @@ export class Tracing extends ChannelOwner<channels.TracingChannel> implements ap
     });
   }
 
-  private async _doStopChunk(filePath: string | undefined) {
+  private async _doStopChunk(filePath: string | undefined, additionalEvents?: ActionTraceEvent[]) {
     this._connection.stopCollectingCallMetadata(this._metadataCollector);
     const metadata = this._metadataCollector;
     this._metadataCollector = [];
@@ -71,7 +72,7 @@ export class Tracing extends ChannelOwner<channels.TracingChannel> implements ap
 
     if (isLocal) {
       const result = await this._channel.tracingStopChunk({ mode: 'entries' });
-      await this._connection.localUtils()._channel.zip({ zipFile: filePath, entries: result.entries!, metadata, mode: 'write', includeSources: this._includeSources });
+      await this._connection.localUtils()._channel.zip({ zipFile: filePath, entries: result.entries!, metadata, mode: 'write', includeSources: this._includeSources, additionalEvents });
       return;
     }
 
@@ -88,6 +89,6 @@ export class Tracing extends ChannelOwner<channels.TracingChannel> implements ap
 
     // Add local sources to the remote trace if necessary.
     if (result.entries?.length)
-      await this._connection.localUtils()._channel.zip({ zipFile: filePath, entries: result.entries!, metadata, mode: 'append', includeSources: this._includeSources });
+      await this._connection.localUtils()._channel.zip({ zipFile: filePath, entries: result.entries!, metadata, mode: 'append', includeSources: this._includeSources, additionalEvents });
   }
 }

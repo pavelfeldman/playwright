@@ -82,6 +82,11 @@ export class LocalUtilsDispatcher extends Dispatcher<{ guid: string }, channels.
         addFile(sourceFile, 'resources/src@' + calculateSha1(sourceFile) + '.txt');
     }
 
+    if (params.additionalEvents) {
+      const lines = params.additionalEvents.map(event => JSON.stringify(event));
+      zipFile.addBuffer(Buffer.from(lines.join('\n')), 'trace.steps');
+    }
+
     if (params.mode === 'write') {
       // New file, just compress the entries.
       await fs.promises.mkdir(path.dirname(params.zipFile), { recursive: true });

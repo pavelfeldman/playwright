@@ -406,9 +406,10 @@ export type LocalUtilsZipParams = {
   mode: 'write' | 'append',
   metadata: ClientSideCallMetadata[],
   includeSources: boolean,
+  additionalEvents?: any[],
 };
 export type LocalUtilsZipOptions = {
-
+  additionalEvents?: any[],
 };
 export type LocalUtilsZipResult = void;
 export type LocalUtilsHarOpenParams = {

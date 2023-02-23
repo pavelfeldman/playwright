@@ -296,11 +296,11 @@ test.describe('Clear completed button', () => {
     await expect(page.getByRole('button', { name: 'Clear completed' })).toBeVisible();
   });
 
-  test('should remove completed items when clicked', async ({ page }) => {
+  test.only('should remove completed items when clicked', async ({ page }) => {
     const todoItems = page.getByTestId('todo-item');
     await todoItems.nth(1).getByRole('checkbox').check();
     await page.getByRole('button', { name: 'Clear completed' }).click();
-    await expect(todoItems).toHaveCount(2);
+    await expect(todoItems).toHaveCount(4);
     await expect(todoItems).toHaveText([TODO_ITEMS[0], TODO_ITEMS[2]]);
   });
 
