@@ -17,7 +17,7 @@
 import type { Frame, Page } from 'playwright-core';
 import { ZipFile } from '../../packages/playwright-core/lib/utils/zipFile';
 import type { StackFrame } from '@protocol/channels';
-import { parseClientSideCallMetadata } from '../../packages/trace/src/traceUtils';
+import { mergeSerializedClientSideCallMetadata } from 'playwright-core/lib/utils';
 
 export async function attachFrame(page: Page, frameId: string, url: string): Promise<Frame> {
   const handle = await page.evaluateHandle(async ({ frameId, url }) => {
@@ -28,20 +28,20 @@ export async function attachFrame(page: Page, frameId: string, url: string): Pro
     await new Promise(x => frame.onload = x);
     return frame;
   }, { frameId, url });
-  return handle.asElement().contentFrame();
+  return handle.asElement().contentFrame() as Promise<Frame>;
 }
 
 export async function detachFrame(page: Page, frameId: string) {
   await page.evaluate(frameId => {
-    document.getElementById(frameId).remove();
+    document.getElementById(frameId)!.remove();
   }, frameId);
 }
 
 export async function verifyViewport(page: Page, width: number, height: number) {
   // `expect` may clash in test runner tests if imported eagerly.
   const { expect } = require('@playwright/test');
-  expect(page.viewportSize().width).toBe(width);
-  expect(page.viewportSize().height).toBe(height);
+  expect(page.viewportSize()!.width).toBe(width);
+  expect(page.viewportSize()!.height).toBe(height);
   expect(await page.evaluate('window.innerWidth')).toBe(width);
   expect(await page.evaluate('window.innerHeight')).toBe(height);
 }
@@ -93,30 +93,34 @@ export function suppressCertificateWarning() {
   };
 }
 
-export async function parseTrace(file: string): Promise<{ events: any[], resources: Map<string, Buffer>, actions: string[], stacks: Map<string, StackFrame[]> }> {
+export async function parseTrace(file: string): Promise<{ events: any[], resources: Map<string, Buffer>, actions: string[], stacks: Map<string, StackFrame[]>, sources: string[] }> {
   const zipFS = new ZipFile(file);
   const resources = new Map<string, Buffer>();
   for (const entry of await zipFS.entries())
     resources.set(entry, await zipFS.read(entry));
   zipFS.close();
 
-  const events = [];
-  for (const line of resources.get('trace.trace').toString().split('\n')) {
-    if (line)
-      events.push(JSON.parse(line));
+  const events: any[] = [];
+  const keys = [...resources.keys()];
+  for (const traceResource of keys.filter(name => name.endsWith('.trace') || name.endsWith('.network'))) {
+    for (const line of resources.get(traceResource)!.toString().split('\n')) {
+      if (line)
+        events.push(JSON.parse(line));
+    }
   }
 
-  for (const line of resources.get('trace.network').toString().split('\n')) {
-    if (line)
-      events.push(JSON.parse(line));
-  }
+  const metadatas: any[] = [];
+  for (const stacksResource of keys.filter(name => name.endsWith('.stacks')))
+    metadatas.push(JSON.parse(resources.get(stacksResource)!.toString()));
+  const stacks = mergeSerializedClientSideCallMetadata(metadatas);
 
-  const stacks = parseClientSideCallMetadata(JSON.parse(resources.get('trace.stacks').toString()));
+  const sources = keys.filter(name => name.startsWith('resources/src@'));
   return {
     events,
     resources,
     actions: eventsToActions(events),
     stacks,
+    sources,
   };
 }
 
