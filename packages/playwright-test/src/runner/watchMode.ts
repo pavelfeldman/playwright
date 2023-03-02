@@ -18,94 +18,19 @@ import readline from 'readline';
 import { createGuid, ManualPromise } from 'playwright-core/lib/utils';
 import type { FullConfigInternal, FullProjectInternal } from '../common/types';
 import { Multiplexer } from '../reporters/multiplexer';
-import { createFileMatcher, createFileMatcherFromArguments } from '../util';
 import type { Matcher } from '../util';
 import { createTaskRunnerForWatch, createTaskRunnerForWatchSetup } from './tasks';
 import type { TaskRunnerState } from './tasks';
 import { buildProjectsClosure, filterProjects } from './projectUtils';
-import { clearCompilationCache, collectAffectedTestFiles } from '../common/compilationCache';
+import { clearCompilationCache } from '../common/compilationCache';
 import type { FullResult } from 'packages/playwright-test/reporter';
-import { chokidar } from '../utilsBundle';
-import type { FSWatcher as CFSWatcher } from 'chokidar';
 import { createReporter } from './reporters';
 import { colors } from 'playwright-core/lib/utilsBundle';
 import { enquirer } from '../utilsBundle';
 import { separator } from '../reporters/base';
 import { PlaywrightServer } from 'playwright-core/lib/remote/playwrightServer';
 import ListReporter from '../reporters/list';
-
-class FSWatcher {
-  private _dirtyTestFiles = new Map<FullProjectInternal, Set<string>>();
-  private _notifyDirtyFiles: (() => void) | undefined;
-  private _watcher: CFSWatcher | undefined;
-  private _timer: NodeJS.Timeout | undefined;
-
-  async update(config: FullConfigInternal) {
-    const commandLineFileMatcher = config._internal.cliArgs.length ? createFileMatcherFromArguments(config._internal.cliArgs) : () => true;
-    const projects = filterProjects(config.projects, config._internal.cliProjectFilter);
-    const projectClosure = buildProjectsClosure(projects);
-    const projectFilters = new Map<FullProjectInternal, Matcher>();
-    for (const project of projectClosure) {
-      const testMatch = createFileMatcher(project.testMatch);
-      const testIgnore = createFileMatcher(project.testIgnore);
-      projectFilters.set(project, file => {
-        if (!file.startsWith(project.testDir) || !testMatch(file) || testIgnore(file))
-          return false;
-        return project._internal.type === 'dependency' || commandLineFileMatcher(file);
-      });
-    }
-
-    if (this._timer)
-      clearTimeout(this._timer);
-    if (this._watcher)
-      await this._watcher.close();
-
-    this._watcher = chokidar.watch(projectClosure.map(p => p.testDir), { ignoreInitial: true }).on('all', async (event, file) => {
-      if (event !== 'add' && event !== 'change')
-        return;
-
-      const testFiles = new Set<string>();
-      collectAffectedTestFiles(file, testFiles);
-      const testFileArray = [...testFiles];
-
-      let hasMatches = false;
-      for (const [project, filter] of projectFilters) {
-        const filteredFiles = testFileArray.filter(filter);
-        if (!filteredFiles.length)
-          continue;
-        let set = this._dirtyTestFiles.get(project);
-        if (!set) {
-          set = new Set();
-          this._dirtyTestFiles.set(project, set);
-        }
-        filteredFiles.map(f => set!.add(f));
-        hasMatches = true;
-      }
-
-      if (!hasMatches)
-        return;
-
-      if (this._timer)
-        clearTimeout(this._timer);
-      this._timer = setTimeout(() => {
-        this._notifyDirtyFiles?.();
-      }, 250);
-    });
-
-  }
-
-  async onDirtyTestFiles(): Promise<void> {
-    if (this._dirtyTestFiles.size)
-      return;
-    await new Promise<void>(f => this._notifyDirtyFiles = f);
-  }
-
-  takeDirtyTestFiles(): Map<FullProjectInternal, Set<string>> {
-    const result = this._dirtyTestFiles;
-    this._dirtyTestFiles = new Map();
-    return result;
-  }
-}
+import { FSWatcher } from './fsWatcher';
 
 export async function runWatchModeLoop(config: FullConfigInternal): Promise<FullResult['status']> {
   // Reset the settings that don't apply to watch.

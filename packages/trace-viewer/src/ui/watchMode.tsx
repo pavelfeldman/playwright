@@ -25,9 +25,11 @@ import { SplitView } from '@web/components/splitView';
 import type { MultiTraceModel } from './modelUtil';
 import './watchMode.css';
 import { ToolbarButton } from '@web/components/toolbarButton';
+import { Toolbar } from '@web/components/toolbar';
 
 let rootSuite: Suite | undefined;
 
+let updateIsRunningTest: (isRunningTest: boolean) => void = () => {};
 let updateList: () => void = () => {};
 let updateProgress: () => void = () => {};
 
@@ -40,6 +42,7 @@ export const WatchModeView: React.FC<{}> = ({
   const [selectedFileSuite, setSelectedFileSuite] = React.useState<Suite | undefined>();
   const [selectedTest, setSelectedTest] = React.useState<TestCase | undefined>();
   const [isRunningTest, setIsRunningTest] = React.useState<boolean>(false);
+  updateIsRunningTest = setIsRunningTest;
   const [expandedFiles] = React.useState(new Map<Suite, boolean | undefined>());
   const [filterText, setFilterText] = React.useState<string>('');
 
@@ -85,38 +88,35 @@ export const WatchModeView: React.FC<{}> = ({
   }
 
   const visibleTestIds = new Set<string>();
-  for (const { test } of entries.values()) {
+  for (const { test, fileSuite } of entries.values()) {
     if (test)
       visibleTestIds.add(test.id);
+    else
+      fileSuite.allTests().forEach(test => visibleTestIds.add(test.id));
   }
 
   const runEntry = (entry: Entry) => {
     expandedFiles.set(entry.fileSuite, true);
     setSelectedTest(entry.test);
-    setIsRunningTest(true);
-    runTests(entry.test ? entry.test.location.file + ':' + entry.test.location.line : entry.fileSuite.title, undefined).then(() => {
-      setIsRunningTest(false);
-    });
+    runTests(entry.test ? entry.test.location.file + ':' + entry.test.location.line : entry.fileSuite.title, undefined);
   };
 
   const selectedEntry = selectedTest ? entries.get(selectedTest) : selectedOrDefaultFileSuite ? entries.get(selectedOrDefaultFileSuite) : undefined;
   return <SplitView sidebarSize={300} orientation='horizontal' sidebarIsFirst={true}>
     <TraceView test={selectedTest} isRunningTest={isRunningTest}></TraceView>
     <div className='vbox watch-mode-sidebar'>
-      <div style={{ flex: 'none', display: 'flex', padding: 4 }}>
+      <Toolbar>
         <input ref={inputRef} type='search' placeholder='Filter tests' spellCheck={false} value={filterText}
           onChange={e => {
             setFilterText(e.target.value);
           }}
           onKeyDown={e => {
-            if (e.key === 'Enter') {
-              setIsRunningTest(true);
-              runTests(undefined, [...visibleTestIds]).then(() => {
-                setIsRunningTest(false);
-              });
-            }
+            if (e.key === 'Enter')
+              runTests(undefined, [...visibleTestIds]);
           }}></input>
-      </div>
+        <ToolbarButton icon='play' title='Run' onClick={() => runTests(undefined, [...visibleTestIds])} disabled={isRunningTest}></ToolbarButton>
+        <ToolbarButton icon='debug-stop' title='Stop' onClick={() => stopTests()} disabled={!isRunningTest}></ToolbarButton>
+      </Toolbar>
       <ListView
         items={[...entries.values()]}
         itemKey={(entry: Entry) => entry.test ? entry.test!.id : entry.fileSuite.title }
@@ -240,9 +240,14 @@ declare global {
 
 const receiver = new TeleReporterReceiver({
   onBegin: (config: FullConfig, suite: Suite) => {
+    updateIsRunningTest(true);
     if (!rootSuite)
       rootSuite = suite;
     updateList();
+  },
+
+  onEnd: () => {
+    updateIsRunningTest(false);
   },
 
   onTestBegin: () => {
@@ -262,14 +267,20 @@ const receiver = new TeleReporterReceiver({
   },
 });
 
-
 (window as any).dispatch = (message: any) => {
   receiver.dispatch(message);
 };
 
-async function runTests(location: string | undefined, testIds: string[] | undefined): Promise<void> {
-  await (window as any).binding({
+function runTests(location: string | undefined, testIds: string[] | undefined) {
+  (window as any).binding({
     method: 'run',
     params: { location, testIds }
+  });
+}
+
+function stopTests() {
+  (window as any).binding({
+    method: 'stop',
+    params: {}
   });
 }

@@ -25,10 +25,14 @@ test.describe('New Todo', () => {
     await newTodo.fill(TODO_ITEMS[0]);
     await newTodo.press('Enter');
 
+    await new Promise(f => setTimeout(f, 2000));
+
     // Make sure the list only has one todo item.
     await expect(page.getByTestId('todo-title')).toHaveText([
       TODO_ITEMS[0]
     ]);
+
+    await new Promise(f => setTimeout(f, 2000));
 
     // Create 2nd todo.
     await newTodo.fill(TODO_ITEMS[1]);

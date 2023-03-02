@@ -23,7 +23,6 @@ import { createGuid } from 'playwright-core/lib/utils';
 import { serializeRegexPatterns } from '../isomorphic/teleReceiver';
 
 export class TeleReporterEmitter implements Reporter {
-  private config!: FullConfig;
   private _messageSink: (message: any) => void;
 
   constructor(messageSink: (message: any) => void) {
@@ -31,7 +30,6 @@ export class TeleReporterEmitter implements Reporter {
   }
 
   onBegin(config: FullConfig, suite: Suite) {
-    this.config = config;
     const projects: any[] = [];
     for (const projectSuite of suite.suites) {
       const report = this._serializeProject(projectSuite);

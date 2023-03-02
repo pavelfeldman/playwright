@@ -15,7 +15,6 @@
  */
 
 import type { FullResult } from 'packages/playwright-test/reporter';
-import type { Page } from 'playwright-core/lib/server/page';
 import { showTraceViewer, serverSideCallMetadata } from 'playwright-core/lib/server';
 import { clearCompilationCache } from '../common/compilationCache';
 import type { FullConfigInternal } from '../common/types';
@@ -25,36 +24,48 @@ import { TeleReporterEmitter } from '../reporters/teleEmitter';
 import { createTaskRunnerForList, createTaskRunnerForWatch, createTaskRunnerForWatchSetup } from './tasks';
 import type { TaskRunnerState } from './tasks';
 import { createReporter } from './reporters';
+import { FSWatcher } from './fsWatcher';
+import { ManualPromise } from 'playwright-core/lib/utils';
 
 export async function runUIMode(config: FullConfigInternal): Promise<FullResult['status']> {
   // Reset the settings that don't apply to watch.
   config._internal.passWithNoTests = true;
+  config._internal.configCLIOverrides.use = config._internal.configCLIOverrides.use || {};
+  config._internal.configCLIOverrides.use.trace = 'on';
+
   for (const p of config.projects)
     p.retries = 0;
 
-  {
-    // Global setup.
-    const reporter = await createReporter(config, 'watch');
-    const taskRunner = createTaskRunnerForWatchSetup(config, reporter);
-    reporter.onConfigure(config);
-    const context: TaskRunnerState = {
-      config,
-      reporter,
-      phases: [],
-    };
-    const { status, cleanup: globalCleanup } = await taskRunner.runDeferCleanup(context, 0);
-    if (status !== 'passed')
-      return await globalCleanup();
-  }
+  // Global setup.
+  const reporter = await createReporter(config, 'watch');
+  const taskRunner = createTaskRunnerForWatchSetup(config, reporter);
+  reporter.onConfigure(config);
+  const context: TaskRunnerState = {
+    config,
+    reporter,
+    phases: [],
+  };
+  const { status, cleanup: globalCleanup } = await taskRunner.runDeferCleanup(context, 0);
+  if (status !== 'passed')
+    return await globalCleanup();
 
   // Show trace viewer.
   const page = await showTraceViewer([], 'chromium', { watchMode: true });
   await page.mainFrame()._waitForFunctionExpression(serverSideCallMetadata(), '!!window.dispatch', false, undefined, { timeout: 0 });
+
+  // Create transport.
+  const teleTransport = (message: any) => {
+    const func = (message: any) => {
+      (window as any).dispatch(message);
+    };
+    // eslint-disable-next-line no-console
+    page.mainFrame().evaluateExpression(String(func), true, message).catch(e => console.log(e));
+  };
+
+  // List
   {
-    // List
-    const controller = new Controller(config, page);
-    const listReporter = new TeleReporterEmitter(message => controller!.send(message));
-    const reporter = new Multiplexer([listReporter]);
+    const teleReporter = new TeleReporterEmitter(teleTransport);
+    const reporter = new Multiplexer([teleReporter]);
     const taskRunner = createTaskRunnerForList(config, reporter);
     const context: TaskRunnerState = {
       config,
@@ -68,50 +79,68 @@ export async function runUIMode(config: FullConfigInternal): Promise<FullResult[
     await taskRunner.run(context, 0);
   }
 
-  await new Promise(() => {});
-  // TODO: implement watch queue with the sigint watcher and global teardown.
-  return 'passed';
-}
+  // Start listening to the commands from the UI.
+  let readCommandPromise: ManualPromise<{ method: string, params: any }>;
+  await page.exposeBinding('binding', false, (source, data) => {
+    readCommandPromise.resolve(data);
+  });
 
+  // Prepare projects that will be watched, set up watcher.
+  const failedTestIdCollector = new Set<string>();
+  const fsWatcher = new FSWatcher();
+  await fsWatcher.update(config);
 
-class Controller {
-  private _page: Page;
-  private _queue = Promise.resolve();
-  private _runReporter: TeleReporterEmitter;
+  let stopPromise: ManualPromise<void> | undefined;
 
-  constructor(config: FullConfigInternal, page: Page) {
-    this._page = page;
-    this._runReporter = new TeleReporterEmitter(message => this!.send(message));
-    this._page.exposeBinding('binding', false, (source, data) => {
-      const { method, params } = data;
-      if (method === 'run') {
-        const { location, testIds } = params;
-        if (location)
-          config._internal.cliArgs = [location];
-        if (testIds) {
-          const testIdSet = testIds ? new Set<string>(testIds) : null;
-          config._internal.testIdMatcher = id => !testIdSet || testIdSet.has(id);
-        }
-        this._queue = this._queue.then(() => runTests(config, this._runReporter));
-        return this._queue;
+  while (true) {
+    readCommandPromise = new ManualPromise();
+    await Promise.race([
+      fsWatcher.onDirtyTestFiles(),
+      readCommandPromise,
+    ]);
+    if (!readCommandPromise.isDone())
+      readCommandPromise.resolve({ method: 'changed', params: {} });
+
+    const { method, params } = await readCommandPromise;
+
+    if (method === 'changed') {
+      const dirtyTestFiles = fsWatcher.takeDirtyTestFiles();
+      // Resolve files that depend on the changed files.
+      // await runChangedTests(config, failedTestIdCollector, dirtyTestFiles);
+      continue;
+    }
+
+    if (method === 'run') {
+      const { location, testIds } = params;
+      if (location) {
+        config._internal.cliArgs = [location];
+        config._internal.testIdMatcher = undefined;
       }
-    });
+      if (testIds) {
+        const testIdSet = testIds ? new Set<string>(testIds) : null;
+        config._internal.cliArgs = [];
+        config._internal.testIdMatcher = id => !testIdSet || testIdSet.has(id);
+      }
+      stopPromise = new ManualPromise();
+      runTests(config, teleTransport, failedTestIdCollector, stopPromise);
+      continue;
+    }
+
+    if (method === 'stop') {
+      stopPromise?.resolve();
+      continue;
+    }
+
+    if (method === 'exit')
+      break;
   }
 
-  send(message: any) {
-    const func = (message: any) => {
-      (window as any).dispatch(message);
-    };
-    // eslint-disable-next-line no-console
-    this._page.mainFrame().evaluateExpression(String(func), true, message).catch(e => console.log(e));
-  }
+  return await globalCleanup();
 }
 
-async function runTests(config: FullConfigInternal, teleReporter: TeleReporterEmitter) {
+async function runTests(config: FullConfigInternal, teleTransport: (message: any) => void, failedTestIdCollector: Set<string>, stopPromise: ManualPromise<void>) {
+  const teleReporter = new TeleReporterEmitter(teleTransport);
   const reporter = new Multiplexer([new ListReporter(), teleReporter]);
-  config._internal.configCLIOverrides.use = config._internal.configCLIOverrides.use || {};
-  config._internal.configCLIOverrides.use.trace = 'on';
-
   const taskRunner = createTaskRunnerForWatch(config, reporter);
   const context: TaskRunnerState = {
     config,
@@ -120,6 +149,22 @@ async function runTests(config: FullConfigInternal, teleReporter: TeleReporterEm
   };
   clearCompilationCache();
   reporter.onConfigure(config);
-  const status = await taskRunner.run(context, 0);
+  const taskStatus = await taskRunner.run(context, 0, stopPromise);
+  let status: FullResult['status'] = 'passed';
+
+  let hasFailedTests = false;
+  for (const test of context.rootSuite?.allTests() || []) {
+    if (test.outcome() === 'unexpected') {
+      failedTestIdCollector.add(test.id);
+      hasFailedTests = true;
+    } else {
+      failedTestIdCollector.delete(test.id);
+    }
+  }
+
+  if (context.phases.find(p => p.dispatcher.hasWorkerErrors()) || hasFailedTests)
+    status = 'failed';
+  if (status === 'passed' && taskStatus !== 'passed')
+    status = taskStatus;
   await reporter.onExit({ status });
 }
