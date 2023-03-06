@@ -42,7 +42,12 @@ export const XTermWrapper: React.FC<{ source: XTermDataSource }> = ({
       if (terminal)
         return;
 
-      const newTerminal = new Terminal({ convertEol: true });
+      const newTerminal = new Terminal({
+        convertEol: true,
+        fontSize: 13,
+        fontFamily: 'var(--vscode-editor-font-family)',
+      });
+      
       const fitAddon = new FitAddon();
       newTerminal.loadAddon(fitAddon);
       for (const p of source.pending)

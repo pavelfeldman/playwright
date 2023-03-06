@@ -15,10 +15,11 @@
  */
 
 import '@web/third_party/vscode/codicon.css';
-import { Workbench } from './workbench';
 import '@web/common.css';
 import React from 'react';
 import { ListView } from '@web/components/listView';
+import type { XTermDataSource } from '@web/components/xtermWrapper';
+import { XTermWrapper } from '@web/components/xtermWrapper';
 import { TeleReporterReceiver } from '../../../playwright-test/src/isomorphic/teleReceiver';
 import type { FullConfig, Suite, TestCase, TestStep } from '../../../playwright-test/types/testReporter';
 import { SplitView } from '@web/components/splitView';
@@ -28,10 +29,25 @@ import { ToolbarButton } from '@web/components/toolbarButton';
 import { Toolbar } from '@web/components/toolbar';
 import { toggleTheme } from '@web/theme';
 import type { ContextEntry } from '../entries';
+import { ActionList } from './actionList';
+import { ActionTraceEvent } from '@trace/trace';
+import { CallTab } from './callTab';
+import { ConsoleTab } from './consoleTab';
+import { NetworkTab } from './networkTab';
+import * as modelUtil from './modelUtil';
+import { SourceTab } from './sourceTab';
+import { TabbedPane, TabbedPaneTabModel } from '@web/components/tabbedPane';
+import { SnapshotTab } from './snapshotTab';
+import { Timeline } from './timeline';
 
 let updateRootSuite: (rootSuite: Suite, progress: Progress) => void = () => {};
 let updateStepsProgress: () => void = () => {};
 let runWatchedTests = () => {};
+const xTermDataSource: XTermDataSource = {
+  pending: [],
+  write: data => xTermDataSource.pending.push(data),
+  resize: (cols: number, rows: number) => sendMessageNoReply('resizeTerminal', { cols, rows }),
+};
 
 export const WatchModeView: React.FC<{}> = ({
 }) => {
@@ -48,6 +64,7 @@ export const WatchModeView: React.FC<{}> = ({
   const [filterText, setFilterText] = React.useState<string>('');
   const [projectNames, setProjectNames] = React.useState<string[]>([]);
   const [expandedItems, setExpandedItems] = React.useState<Map<string, boolean>>(new Map());
+  const [model, setModel] = React.useState<MultiTraceModel | undefined>();
 
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -83,11 +100,28 @@ export const WatchModeView: React.FC<{}> = ({
     return { listItems };
   }, [filteredItems, filterText, expandedItems]);
 
-  const selectedTreeItem = selectedTreeItemId ? treeItemMap.get(selectedTreeItemId) : undefined;
+  const { selectedTreeItem, selectedTestItem } = React.useMemo(() => {
+    const selectedTreeItem = selectedTreeItemId ? treeItemMap.get(selectedTreeItemId) : undefined;
+    let selectedTestItem: TestItem | undefined;
+    if (selectedTreeItem?.kind === 'test')
+      selectedTestItem = selectedTreeItem;
+    else if (selectedTreeItem?.kind === 'case' && selectedTreeItem.children?.length === 1)
+      selectedTestItem = selectedTreeItem.children[0]! as TestItem;
+    return { selectedTreeItem, selectedTestItem };
+  }, [selectedTreeItemId, treeItemMap]);
 
   React.useEffect(() => {
-    sendMessageNoReply('watch', { fileName: fileName(selectedTreeItem) });
-  }, [selectedTreeItem, treeItemMap]);
+    sendMessageNoReply('watch', { fileName: fileName(selectedTestItem) });
+
+    setModel(undefined);
+    for (const result of selectedTestItem?.test?.results || []) {
+      const attachment = result.attachments.find(a => a.name === 'trace');
+      if (attachment && attachment.path) {
+        loadSingleTraceFile(attachment.path).then(setModel);
+        return;
+      }
+    }
+  }, [selectedTestItem, treeItemMap]);
 
   const runTreeItem = (treeItem: TreeItem) => {
     expandedItems.set(treeItem.id, true);
@@ -107,14 +141,14 @@ export const WatchModeView: React.FC<{}> = ({
     });
   };
 
-  let selectedTestItem: TestItem | undefined;
-  if (selectedTreeItem?.kind === 'test')
-    selectedTestItem = selectedTreeItem;
-  else if (selectedTreeItem?.kind === 'case' && selectedTreeItem.children?.length === 1)
-    selectedTestItem = selectedTreeItem.children[0]! as TestItem;
-
   return <SplitView sidebarSize={300} orientation='horizontal' sidebarIsFirst={true}>
-    <TraceView testItem={selectedTestItem} isRunningTest={isRunningTest}></TraceView>
+    <TraceView
+      testItem={selectedTestItem}
+      model={model}
+      isRunningTest={isRunningTest}
+      additionalTabs={[
+        { id: 'output', title: 'Output', render: () => <XTermWrapper source={xTermDataSource}></XTermWrapper> },
+      ]} />
     <div className='vbox watch-mode-sidebar'>
       <Toolbar>
         <h3 className='title'>Test explorer</h3>
@@ -243,42 +277,56 @@ export const StepsView: React.FC<{
 
 export const TraceView: React.FC<{
   testItem: TestItem | undefined,
+  model: MultiTraceModel | undefined,
   isRunningTest: boolean,
-}> = ({ testItem, isRunningTest }) => {
-  const [model, setModel] = React.useState<MultiTraceModel | undefined>();
+  additionalTabs?: TabbedPaneTabModel[],
+}> = ({ testItem, model, isRunningTest, additionalTabs }) => {
+  const [selectedAction, setSelectedAction] = React.useState<ActionTraceEvent | undefined>();
+  const [highlightedAction, setHighlightedAction] = React.useState<ActionTraceEvent | undefined>();
+  const [selectedDrawerTab, setSelectedDrawerTab] = React.useState<string>('output');
 
-  React.useEffect(() => {
-    (async () => {
-      if (!testItem) {
-        setModel(undefined);
-        return;
-      }
-      for (const result of testItem?.test.results || []) {
-        const attachment = result.attachments.find(a => a.name === 'trace');
-        if (attachment && attachment.path) {
-          setModel(await loadSingleTraceFile(attachment.path));
-          return;
-        }
-      }
-      setModel(undefined);
-    })();
-  }, [testItem, isRunningTest]);
+  const activeAction = highlightedAction || selectedAction;
 
-  if (isRunningTest)
-    return <StepsView testItem={testItem}></StepsView>;
+  const { errors, warnings } = activeAction ? modelUtil.stats(activeAction) : { errors: 0, warnings: 0 };
+  const consoleCount = errors + warnings;
+  const networkCount = activeAction ? modelUtil.resourcesForAction(activeAction).length : 0;
 
-  if (!model) {
-    return <div className='vbox'>
-      <div className='drop-target'>
-        <div>Run test to see the trace</div>
-        <div style={{ paddingTop: 20 }}>
-          <div>Double click a test or hit Enter</div>
-        </div>
-      </div>
-    </div>;
-  }
+  const drawerTabs: TabbedPaneTabModel[] = [
+    { id: 'logs', title: 'Call', render: () => <CallTab action={activeAction} sdkLanguage={model?.sdkLanguage || 'javascript'} /> },
+    { id: 'console', title: 'Console', count: consoleCount, render: () => <ConsoleTab action={activeAction} /> },
+    { id: 'network', title: 'Network', count: networkCount, render: () => <NetworkTab action={activeAction} /> },
+  ];
 
-  return <Workbench model={model} />;
+  if (model?.hasSource)
+    drawerTabs.push({ id: 'source', title: 'Source', count: 0, render: () => <SourceTab action={activeAction} /> });
+  drawerTabs.push(...(additionalTabs || []));
+
+  const sdkLanguage = model?.sdkLanguage || 'javascript';
+  return <div className='vbox'>
+    <Timeline
+      model={model}
+      selectedAction={activeAction}
+      onSelected={action => setSelectedAction(action)}
+    />
+    <SplitView sidebarSize={300} orientation='vertical'>
+      <SplitView sidebarSize={300} orientation='horizontal'>
+        <SnapshotTab action={highlightedAction || selectedAction} sdkLanguage={sdkLanguage} testIdAttributeName={model?.testIdAttributeName || 'data-testid'} />
+        <ActionList
+          sdkLanguage={sdkLanguage}
+          actions={model?.actions || []}
+          selectedAction={selectedAction}
+          onSelected={action => {
+            setSelectedAction(action);
+          }}
+          onHighlighted={action => {
+            setHighlightedAction(action);
+          }}
+          revealConsole={() => {}}
+        />
+      </SplitView>
+      <TabbedPane tabs={drawerTabs} selectedTab={selectedDrawerTab} setSelectedTab={setSelectedDrawerTab}/>
+    </SplitView>
+  </div>;
 };
 
 declare global {
@@ -329,10 +377,18 @@ const resetCollectingRootSuite = () => {
 };
 
 (window as any).dispatch = (message: any) => {
-  if (message.method === 'fileChanged')
+  if (message.method === 'fileChanged') {
     runWatchedTests();
-  else
+  } else if (message.method === 'stdio') {
+    if (message.params.buffer) {
+      const data = atob(message.params.buffer);
+      xTermDataSource.write(data);
+    } else {
+      xTermDataSource.write(message.params.text);
+    }
+  } else {
     receiver?.dispatch(message);
+  }
 };
 
 const sendMessage = async (method: string, params: any) => {

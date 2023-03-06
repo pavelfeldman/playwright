@@ -92,7 +92,7 @@ test('should open trace viewer on specific host', async ({ showTraceViewer }, te
   await expect(traceViewer.page).toHaveURL(/127.0.0.1/);
 });
 
-test('should open simple trace viewer', async ({ showTraceViewer }) => {
+test.only('should open simple trace viewer', async ({ showTraceViewer }) => {
   const traceViewer = await showTraceViewer([traceFile]);
   await expect(traceViewer.actionTitles).toHaveText([
     /browserContext.newPage/,
