@@ -35,10 +35,12 @@ export const SourceTab: React.FunctionComponent<{
   const [lastAction, setLastAction] = React.useState<ActionTraceEvent | undefined>();
   const [selectedFrame, setSelectedFrame] = React.useState<number>(0);
 
-  if (lastAction !== action) {
-    setLastAction(action);
-    setSelectedFrame(0);
-  }
+  React.useEffect(() => {
+    if (lastAction !== action) {
+      setLastAction(action);
+      setSelectedFrame(0);
+    }  
+  }, [lastAction, action, setLastAction, setSelectedFrame]);
 
   const stackInfo = React.useMemo<StackInfo>(() => {
     if (!action)
@@ -58,8 +60,10 @@ export const SourceTab: React.FunctionComponent<{
       const sha1 = await calculateSha1(filePath);
       try {
         let response = await fetch(`sha1/src@${sha1}.txt`);
-        if (response.status === 404)
+        if (response.status === 404) {
+          console.log('SRC', `file?path=${filePath}`);
           response = await fetch(`file?path=${filePath}`);
+        }
         stackInfo.fileContent.set(filePath, await response.text());
       } catch {
         stackInfo.fileContent.set(filePath, `<Unable to read "${filePath}">`);

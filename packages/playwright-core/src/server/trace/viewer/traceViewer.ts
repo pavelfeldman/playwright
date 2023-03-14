@@ -24,14 +24,19 @@ import { installAppIcon, syncLocalStorageWithSettings } from '../../chromium/crA
 import { serverSideCallMetadata } from '../../instrumentation';
 import { createPlaywright } from '../../playwright';
 import { ProgressController } from '../../progress';
+import { yazl } from '../../../zipBundle';
 import type { Page } from '../../page';
+import EventEmitter from 'events';
+import type * as http from 'http';
 
 type Options = { app?: string, headless?: boolean, host?: string, port?: number };
+
+let TTT = 0;
 
 export async function showTraceViewer(traceUrls: string[], browserName: string, options?: Options): Promise<Page> {
   const { headless = false, host, port, app } = options || {};
   for (const traceUrl of traceUrls) {
-    if (!traceUrl.startsWith('http://') && !traceUrl.startsWith('https://') && !fs.existsSync(traceUrl)) {
+    if (!traceUrl.startsWith('http://') && !traceUrl.startsWith('https://') && !fs.existsSync(traceUrl) && !fs.existsSync(traceUrl + '.trace')) {
       // eslint-disable-next-line no-console
       console.error(`Trace file ${traceUrl} does not exist!`);
       process.exit(1);
@@ -40,12 +45,26 @@ export async function showTraceViewer(traceUrls: string[], browserName: string, 
   const server = new HttpServer();
   server.routePrefix('/trace', (request, response) => {
     const url = new URL('http://localhost' + request.url!);
+    console.log('REQUEST', String(url));
     const relativePath = url.pathname.slice('/trace'.length);
     if (relativePath.endsWith('/stall.js'))
       return true;
     if (relativePath.startsWith('/file')) {
+      TTT = performance.now();
       try {
-        return server.serveFile(request, response, url.searchParams.get('path')!);
+        const filePath = url.searchParams.get('path')!;
+        if (fs.existsSync(filePath))
+          return server.serveFile(request, response, url.searchParams.get('path')!);
+        if (fs.existsSync(filePath + '.trace')) {
+          response.statusCode = 200;
+          response.setHeader('Content-Type', 'application/octet-stream');
+          // response.end('AAA');
+          // const buffer = Buffer.from('Hello World!', 'utf-8');
+          // const bufferStream = Readable.from(buffer);
+          // bufferStream.pipe(response);
+          pipeZip(filePath, response);
+          return true;
+        }
       } catch (e) {
         return false;
       }
@@ -101,4 +120,26 @@ export async function showTraceViewer(traceUrls: string[], browserName: string, 
   const searchQuery = params.length ? '?' + params.join('&') : '';
   await page.mainFrame().goto(serverSideCallMetadata(), urlPrefix + `/trace/${app || 'index.html'}${searchQuery}`);
   return page;
+}
+
+function pipeZip(traceName: string, response: http.ServerResponse) {
+  const zipFile = new yazl.ZipFile();
+  (zipFile as any as EventEmitter).on('error', error => console.error(error));
+
+  if (fs.existsSync(traceName + '.trace'))
+    zipFile.addBuffer(fs.readFileSync(traceName + '.trace'), 'trace.trace', { compress: false });
+  if (fs.existsSync(traceName + '.network'))
+    zipFile.addBuffer(fs.readFileSync(traceName + '.network'), 'trace.network', { compress: false });
+  if (fs.existsSync(traceName + '.stacks'))
+    zipFile.addBuffer(fs.readFileSync(traceName + '.stacks'), 'trace.stacks', { compress: false });
+  const resources = path.resolve(traceName, '../resources');
+  for (const file of fs.readdirSync(resources)) {
+    try {
+      zipFile.addFile(path.join(resources, file), 'resources/' + file, { compress: false });
+    } catch (e) {
+      console.log(e);
+    }
+  }
+  zipFile.addBuffer(Buffer.from(resources), 'trace.basedir', { compress: false });
+  zipFile.end(undefined, () => zipFile.outputStream.pipe(response).on('close', () => console.log(performance.now() - TTT)));
 }

@@ -88,7 +88,7 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
       await removeFolders([dir]);
   }, { scope: 'worker', _title: 'playwright configuration' } as any],
 
-  _browserOptions: [async ({ playwright, headless, channel, launchOptions, connectOptions }, use) => {
+  _browserOptions: [async ({ playwright, headless, channel, launchOptions, connectOptions, _artifactsDir }, use) => {
     const options: LaunchOptions = {
       handleSIGINT: false,
       timeout: 0,
@@ -98,6 +98,7 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
       options.headless = headless;
     if (channel !== undefined)
       options.channel = channel;
+    options.tracesDir = path.join(_artifactsDir(), 'traces');
 
     for (const browserType of [playwright.chromium, playwright.firefox, playwright.webkit]) {
       (browserType as BrowserTypeImpl)._defaultLaunchOptions = options;
@@ -287,7 +288,7 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
       if (captureTrace) {
         const title = [path.relative(testInfo.project.testDir, testInfo.file) + ':' + testInfo.line, ...testInfo.titlePath.slice(1)].join(' › ');
         if (!(tracing as any)[kTracingStarted]) {
-          await tracing.start({ ...traceOptions, title });
+          await tracing.start({ ...traceOptions, title, name: testInfo.testId });
           (tracing as any)[kTracingStarted] = true;
         } else {
           await tracing.startChunk({ title });

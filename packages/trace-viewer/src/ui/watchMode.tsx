@@ -122,6 +122,11 @@ export const WatchModeView: React.FC<{}> = ({
 
   const isRunningTest = !!runningState;
   const result = selectedTest?.results[0];
+  let outputDir = '';
+  for (const p of rootSuite.value?.suites || []) {
+    outputDir = p.project()?.outputDir || '';
+    break;
+  }
   const isFinished = result && result.duration >= 0;
   return <div className='vbox watch-mode'>
     <SplitView sidebarSize={250} orientation='horizontal' sidebarIsFirst={true}>
@@ -136,7 +141,7 @@ export const WatchModeView: React.FC<{}> = ({
         </div>
         <div className={'vbox' + (isShowingOutput ? ' hidden' : '')}>
           {isFinished && <FinishedTraceView testResult={result} />}
-          {!isFinished && <InProgressTraceView testResult={result} />}
+          {!isFinished && <InProgressTraceView outputDir={outputDir} testCase={selectedTest} testResult={result} />}
         </div>
       </div>
       <div className='vbox watch-mode-sidebar'>
@@ -381,16 +386,20 @@ const TestList: React.FC<{
 };
 
 const InProgressTraceView: React.FC<{
+  outputDir: string,
+  testCase: TestCase | undefined,
   testResult: TestResult | undefined,
-}> = ({ testResult }) => {
+}> = ({ outputDir, testCase, testResult }) => {
   const [model, setModel] = React.useState<MultiTraceModel | undefined>();
   const [stepsProgress, setStepsProgress] = React.useState(0);
-  updateStepsProgress = () => setStepsProgress(stepsProgress + 1);
-
-  React.useEffect(() => {
-    setModel(testResult ? stepsToModel(testResult) : undefined);
-  }, [stepsProgress, testResult]);
-
+  updateStepsProgress = () => {
+    setStepsProgress(stepsProgress + 1);
+    const traceLocation = `${outputDir}/.playwright-artifacts-${testResult?.workerIndex}/traces/${testCase?.id}`;
+    loadSingleTraceFile(traceLocation).then(setModel);
+  };
+  // React.useEffect(() => {
+  //   setModel(testResult ? stepsToModel(testResult) : undefined);
+  // }, [stepsProgress, testResult]);
   return <Workbench model={model} hideTimelineBars={true} hideStackFrames={true} showSourcesFirst={true} />;
 };
 
@@ -433,6 +442,18 @@ const throttleUpdateRootSuite = (rootSuite: Suite, progress: Progress, immediate
     throttleTimer = setTimeout(throttledAction, 250);
 };
 
+let throttleTimer2: NodeJS.Timeout | undefined;
+const throttledAction2 = () => {
+  clearTimeout(throttleTimer2);
+  throttleTimer2 = undefined;
+  updateStepsProgress();
+};
+
+const throttleUpdateStepsProgress = () => {
+  if (!throttleTimer2)
+    throttleTimer2 = setTimeout(throttledAction2, 250);
+};
+
 const refreshRootSuite = (eraseResults: boolean): Promise<void> => {
   if (!eraseResults)
     return sendMessage('list', {});
@@ -472,15 +493,15 @@ const refreshRootSuite = (eraseResults: boolean): Promise<void> => {
         ++progress.passed;
       throttleUpdateRootSuite(rootSuite, progress);
       // This will update selected trace viewer.
-      updateStepsProgress();
+      throttleUpdateStepsProgress();
     },
 
     onStepBegin: () => {
-      updateStepsProgress();
+      throttleUpdateStepsProgress();
     },
 
     onStepEnd: () => {
-      updateStepsProgress();
+      throttleUpdateStepsProgress();
     },
   });
   return sendMessage('list', {});

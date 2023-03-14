@@ -50,7 +50,6 @@ export const ActionList: React.FC<ActionListProps> = ({
     onHighlighted={onHighlighted}
     isError={action => !!action.error?.message}
     render={action => renderAction(action, sdkLanguage, revealConsole)}
-    noItemsMessage='No actions'
   />;
 };
 
@@ -68,10 +67,10 @@ const renderAction = (
       {locator && <div className='action-selector' title={locator}>{locator}</div>}
       {action.method === 'goto' && action.params.url && <div className='action-url' title={action.params.url}>{action.params.url}</div>}
     </div>
-    <div className='action-duration' style={{ flex: 'none' }}>{action.endTime ? msToString(action.endTime - action.startTime) : 'Timed Out'}</div>
+    <div className='action-duration' style={{ flex: 'none' }}>{action.endTime ? msToString(action.endTime - action.startTime) : <span className='codicon codicon-loading'></span>}</div>
     <div className='action-icons' onClick={() => revealConsole()}>
-      {!!errors && <div className='action-icon'><span className={'codicon codicon-error'}></span><span className="action-icon-value">{errors}</span></div>}
-      {!!warnings && <div className='action-icon'><span className={'codicon codicon-warning'}></span><span className="action-icon-value">{warnings}</span></div>}
+      {!!errors && <div className='action-icon'><span className='codicon codicon-error'></span><span className="action-icon-value">{errors}</span></div>}
+      {!!warnings && <div className='action-icon'><span className='codicon codicon-warning'></span><span className="action-icon-value">{warnings}</span></div>}
     </div>
   </>;
 };

@@ -29,7 +29,7 @@ const zipjs = zipImport as typeof zip;
 export class TraceModel {
   contextEntries: ContextEntry[] = [];
   pageEntries = new Map<string, PageEntry>();
-  private _snapshotStorage: PersistentSnapshotStorage | undefined;
+  private _snapshotStorage: BaseSnapshotStorage | undefined;
   private _entries = new Map<string, zip.Entry>();
   private _version: number | undefined;
   private _zipReader: zip.ZipReader | undefined;
@@ -52,7 +52,13 @@ export class TraceModel {
 
     const ordinals: string[] = [];
     let hasSource = false;
+    let baseDir = '';
     for (const entry of await this._zipReader.getEntries({ onprogress: progress })) {
+      if (entry.filename.endsWith('.basedir')) {
+        const writer = new zipjs.TextWriter() as zip.TextWriter;
+        await entry!.getData!(writer);
+        baseDir = await writer.getData();
+      }
       const match = entry.filename.match(/([\d]+-)?trace\.trace/);
       if (match)
         ordinals.push(match[1] || '');
@@ -63,7 +69,7 @@ export class TraceModel {
     if (!ordinals.length)
       throw new Error('Cannot find .trace file');
 
-    this._snapshotStorage = new PersistentSnapshotStorage(this._entries);
+    this._snapshotStorage = baseDir ? new FSSnapshotStorage(baseDir) : new ZipSnapshotStorage(this._entries);
 
     for (const ordinal of ordinals) {
       const contextEntry = createEmptyContext();
@@ -115,7 +121,7 @@ export class TraceModel {
     return await blobWriter.getData();
   }
 
-  storage(): PersistentSnapshotStorage {
+  storage(): BaseSnapshotStorage {
     return this._snapshotStorage!;
   }
 
@@ -154,7 +160,11 @@ export class TraceModel {
         break;
       }
       case 'action': {
-        contextEntry!.actions.push(event);
+        const existing = contextEntry!.actions.find(a => event.callId === a.callId);
+        if (existing)
+          contextEntry!.actions[contextEntry!.actions.indexOf(existing)] = event;
+        else
+          contextEntry!.actions.push(event);
         break;
       }
       case 'event': {
@@ -289,7 +299,7 @@ export class TraceModel {
   }
 }
 
-export class PersistentSnapshotStorage extends BaseSnapshotStorage {
+export class ZipSnapshotStorage extends BaseSnapshotStorage {
   private _entries: Map<string, zip.Entry>;
 
   constructor(entries: Map<string, zip.Entry>) {
@@ -302,5 +312,23 @@ export class PersistentSnapshotStorage extends BaseSnapshotStorage {
     const writer = new zipjs.BlobWriter();
     await entry.getData!(writer);
     return writer.getData();
+  }
+}
+
+export class FSSnapshotStorage extends BaseSnapshotStorage {
+  private _baseDir: string;
+
+  constructor(baseDir: string) {
+    super();
+    this._baseDir = baseDir;
+  }
+
+  async resourceContent(sha1: string): Promise<Blob | undefined> {
+    const url = new URL(self.location.href);
+    url.pathname = '/trace/file';
+    url.searchParams.set('path', this._baseDir + '/' + sha1);
+    console.log('READING', url.toString());
+    const response = await fetch(url);
+    return response.blob();
   }
 }

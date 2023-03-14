@@ -68,7 +68,7 @@ it('should uncheck radio by aria role', async ({ page }) => {
   expect(await page.evaluate(() => window['checkbox'].getAttribute('aria-checked'))).toBe('false');
 });
 
-it('should check the box by aria role', async ({ page }) => {
+it.only('should check the box by aria role', async ({ page }) => {
   for (const role of ['checkbox', 'menuitemcheckbox', 'option', 'radio', 'switch', 'menuitemradio', 'treeitem']) {
     await it.step(`role=${role}`, async () => {
       await page.setContent(`<div role='${role}' id='checkbox'>CHECKBOX</div>

@@ -138,6 +138,7 @@ export class Tracing extends SdkObject implements InstrumentationListener, Snaps
     state.resourcesDir = path.join(state.tracesDir, 'resources');
     state.traceFile = path.join(state.tracesDir, traceName + '.trace');
     state.networkFile = path.join(state.tracesDir, traceName + '.network');
+    console.log(this._state);
     this._writeChain = fs.promises.mkdir(state.resourcesDir, { recursive: true }).then(() => fs.promises.writeFile(state.networkFile, ''));
     if (options.snapshots)
       this._harTracer.start();
@@ -319,6 +320,10 @@ export class Tracing extends SdkObject implements InstrumentationListener, Snaps
     // Elements resolved from selectors will be marked on the snapshot.
     metadata.afterSnapshot = `after@${metadata.id}`;
     const beforeSnapshot = this._captureSnapshot('before', sdkObject, metadata);
+    await beforeSnapshot;
+    const event = createActionTraceEvent(metadata);
+    if (event)
+      this._appendTraceEvent(event);
     this._pendingCalls.set(metadata.id, { sdkObject, metadata, beforeSnapshot });
     await beforeSnapshot;
   }
