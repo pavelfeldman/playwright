@@ -4667,6 +4667,8 @@ export interface Page {
    */
   accessibility: Accessibility;
 
+  clock: Clock;
+
   /**
    * **NOTE** Only available for Chromium atm.
    *
@@ -16378,6 +16380,27 @@ export interface BrowserServer {
    * to establish connection to the browser.
    */
   wsEndpoint(): string;
+}
+
+export interface Clock {
+  /**
+   * @param options
+   */
+  install(options?: {
+    now?: number;
+  }): Promise<void>;
+
+  /**
+   * @param now
+   */
+  setTime(now: number): Promise<void>;
+
+  /**
+   * @param time
+   */
+  tick(time: number): Promise<void>;
+
+  uninstall(): Promise<void>;
 }
 
 /**

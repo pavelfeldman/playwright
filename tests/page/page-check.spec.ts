@@ -145,3 +145,8 @@ it('should check the box using setChecked', async ({ page }) => {
   await page.setChecked('input', false);
   expect(await page.evaluate(() => window['checkbox'].checked)).toBe(false);
 });
+
+it.only('clock', async ({ page }) => {
+  await page.clock.install({ now: 0 });
+  await new Promise(() => {});
+});

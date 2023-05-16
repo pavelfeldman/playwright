@@ -811,6 +811,10 @@ When all steps combined have not finished during the specified [`option: timeout
 ### option: Page.click.trial = %%-input-trial-%%
 * since: v1.11
 
+## property: Page.clock
+* since: v1.35
+- type: <[Clock]>
+
 ## async method: Page.close
 * since: v1.8
 

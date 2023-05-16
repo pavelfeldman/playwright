@@ -16,6 +16,7 @@
  */
 
 import * as os from 'os';
+import * as js from './javascript';
 import { TimeoutSettings } from '../common/timeoutSettings';
 import { createGuid, debugMode } from '../utils';
 import { mkdirIfNeeded } from '../utils/fileUtils';
@@ -546,13 +547,20 @@ export abstract class BrowserContext extends SdkObject {
   }
 
   async extendInjectedScript(source: string, arg?: any) {
-    const installInFrame = (frame: frames.Frame) => frame.extendInjectedScript(source, arg).catch(() => {});
+    const extension = new InjectedScriptExtension();
+    const installInFrame = (frame: frames.Frame) => {
+      frame.extendInjectedScript(source, arg).catch(() => {}).then(handle => {
+        if (handle)
+          extension.handles.push(handle);
+      });
+    };
     const installInPage = (page: Page) => {
       page.on(Page.Events.InternalFrameNavigatedToNewDocument, installInFrame);
       return Promise.all(page.frames().map(installInFrame));
     };
     this.on(BrowserContext.Events.Page, installInPage);
-    return Promise.all(this.pages().map(installInPage));
+    await Promise.all(this.pages().map(installInPage));
+    return extension;
   }
 
   async _harStart(page: Page | null, options: channels.RecordHarOptions): Promise<string> {
@@ -578,6 +586,10 @@ export abstract class BrowserContext extends SdkObject {
     await Promise.all([...this._routesInFlight].map(r => r.abort())).catch(() => {});
     this._routesInFlight.clear();
   }
+}
+
+export class InjectedScriptExtension {
+  handles: js.JSHandle[] = [];
 }
 
 export function assertBrowserContextIsNotOwned(context: BrowserContext) {

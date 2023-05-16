@@ -27,6 +27,7 @@ const injectedScripts = [
   path.join(ROOT, 'packages', 'playwright-core', 'src', 'server', 'injected', 'injectedScript.ts'),
   path.join(ROOT, 'packages', 'playwright-core', 'src', 'server', 'injected', 'consoleApi.ts'),
   path.join(ROOT, 'packages', 'playwright-core', 'src', 'server', 'injected', 'recorder.ts'),
+  path.join(ROOT, 'packages', 'playwright-core', 'src', 'server', 'injected', 'fakeTimers.ts'),
 ];
 
 const modulePrefix = `
@@ -36,18 +37,38 @@ var __toCommonJS = mod => ({ ...mod, __esModule: true });
 
 async function replaceEsbuildHeader(content, outFileJs) {
   const sourcesStart = content.indexOf('// packages/playwright-core/src/server');
+  const nodeModulesStart = content.indexOf('// node_modules');
   if (sourcesStart === -1)
     throw new Error(`Did not find start of bundled code in ${outFileJs}`);
+  const start = Math.min(sourcesStart, nodeModulesStart);
 
-  const preamble = content.substring(0, sourcesStart);
+  const preamble = content.substring(0, start);
   // Replace standard esbuild definition with our own which do not depend on builtins.
   // See https://github.com/microsoft/playwright/issues/17029
   if (preamble.indexOf('__toCommonJS') !== -1) {
-    content = modulePrefix + content.substring(sourcesStart);
+    content = modulePrefix + content.substring(start);
     await fs.promises.writeFile(outFileJs, content);
   }
   return content;
 }
+
+/**
+ * @type {import('esbuild').Plugin}
+ */
+const utilPlugin = {
+  name: 'util',
+
+  setup(build) {
+    build.onResolve({ filter: /^util$/ }, args => ({
+      path: args.path,
+      namespace: 'util-ns',
+    }));
+    build.onLoad({ filter: /.*/, namespace: 'util-ns' }, () => ({
+      contents: '{}',
+      loader: 'json',
+    }));
+  },
+};
 
 (async () => {
   const generatedFolder = path.join(ROOT, 'packages', 'playwright-core', 'src', 'generated');
@@ -60,7 +81,8 @@ async function replaceEsbuildHeader(content, outFileJs) {
       outdir,
       format: 'cjs',
       platform: 'browser',
-      target: 'ES2019'
+      target: 'ES2019',
+      plugins: [utilPlugin],
     });
     const baseName = path.basename(injected);
     const outFileJs = path.join(outdir, baseName.replace('.ts', '.js'));

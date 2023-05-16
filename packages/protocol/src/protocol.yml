@@ -1599,6 +1599,20 @@ Page:
           - requestFailed
         enabled: boolean
 
+    clockInstall:
+      parameters:
+        now: number?
+
+    clockTick:
+      parameters:
+        time: number
+
+    clockSetTime:
+      parameters:
+        now: number
+
+    clockUninstall:
+
   events:
 
     bindingCall:

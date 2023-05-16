@@ -1221,6 +1221,20 @@ scheme.PageUpdateSubscriptionParams = tObject({
   enabled: tBoolean,
 });
 scheme.PageUpdateSubscriptionResult = tOptional(tObject({}));
+scheme.PageClockInstallParams = tObject({
+  now: tOptional(tNumber),
+});
+scheme.PageClockInstallResult = tOptional(tObject({}));
+scheme.PageClockTickParams = tObject({
+  time: tNumber,
+});
+scheme.PageClockTickResult = tOptional(tObject({}));
+scheme.PageClockSetTimeParams = tObject({
+  now: tNumber,
+});
+scheme.PageClockSetTimeResult = tOptional(tObject({}));
+scheme.PageClockUninstallParams = tOptional(tObject({}));
+scheme.PageClockUninstallResult = tOptional(tObject({}));
 scheme.FrameInitializer = tObject({
   url: tString,
   name: tString,

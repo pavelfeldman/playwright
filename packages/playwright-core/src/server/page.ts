@@ -43,6 +43,7 @@ import type { TimeoutOptions } from '../common/types';
 import { isInvalidSelectorError } from '../utils/isomorphic/selectorParser';
 import { parseEvaluationResultValue, source } from './isomorphic/utilityScriptSerializers';
 import type { SerializedValue } from './isomorphic/utilityScriptSerializers';
+import { Clock } from './clock';
 
 export interface PageDelegate {
   readonly rawMouse: input.RawMouse;
@@ -145,6 +146,7 @@ export class Page extends SdkObject {
   readonly _disconnectedPromise = new ManualPromise<Error>();
   readonly _crashedPromise = new ManualPromise<Error>();
   readonly _browserContext: BrowserContext;
+  readonly clock: Clock;
   readonly keyboard: input.Keyboard;
   readonly mouse: input.Mouse;
   readonly touchscreen: input.Touchscreen;
@@ -180,6 +182,7 @@ export class Page extends SdkObject {
     this._delegate = delegate;
     this._browserContext = browserContext;
     this.accessibility = new accessibility.Accessibility(delegate.getAccessibilityTree.bind(delegate));
+    this.clock = new Clock(this);
     this.keyboard = new input.Keyboard(delegate.rawKeyboard, this);
     this.mouse = new input.Mouse(delegate.rawMouse, this);
     this.touchscreen = new input.Touchscreen(delegate.rawTouchscreen, this);

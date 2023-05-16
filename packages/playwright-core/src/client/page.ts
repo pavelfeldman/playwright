@@ -49,6 +49,7 @@ import { Video } from './video';
 import { Waiter } from './waiter';
 import { Worker } from './worker';
 import { HarRouter } from './harRouter';
+import { Clock } from './clock';
 
 type PDFOptions = Omit<channels.PagePdfParams, 'width' | 'height' | 'margin'> & {
   width?: string | number,
@@ -83,6 +84,7 @@ export class Page extends ChannelOwner<channels.PageChannel> implements api.Page
   private _routes: RouteHandler[] = [];
 
   readonly accessibility: Accessibility;
+  readonly clock: Clock;
   readonly coverage: Coverage;
   readonly keyboard: Keyboard;
   readonly mouse: Mouse;
@@ -108,6 +110,7 @@ export class Page extends ChannelOwner<channels.PageChannel> implements api.Page
     this._timeoutSettings = new TimeoutSettings(this._browserContext._timeoutSettings);
 
     this.accessibility = new Accessibility(this._channel);
+    this.clock = new Clock(this._channel);
     this.keyboard = new Keyboard(this);
     this.mouse = new Mouse(this);
     this.request = this._browserContext.request;

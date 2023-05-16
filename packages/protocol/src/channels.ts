@@ -1767,6 +1767,10 @@ export interface PageChannel extends PageEventTarget, EventTargetChannel {
   stopCSSCoverage(params?: PageStopCSSCoverageParams, metadata?: CallMetadata): Promise<PageStopCSSCoverageResult>;
   bringToFront(params?: PageBringToFrontParams, metadata?: CallMetadata): Promise<PageBringToFrontResult>;
   updateSubscription(params: PageUpdateSubscriptionParams, metadata?: CallMetadata): Promise<PageUpdateSubscriptionResult>;
+  clockInstall(params: PageClockInstallParams, metadata?: CallMetadata): Promise<PageClockInstallResult>;
+  clockTick(params: PageClockTickParams, metadata?: CallMetadata): Promise<PageClockTickResult>;
+  clockSetTime(params: PageClockSetTimeParams, metadata?: CallMetadata): Promise<PageClockSetTimeResult>;
+  clockUninstall(params?: PageClockUninstallParams, metadata?: CallMetadata): Promise<PageClockUninstallResult>;
 }
 export type PageBindingCallEvent = {
   binding: BindingCallChannel,
@@ -2208,6 +2212,30 @@ export type PageUpdateSubscriptionOptions = {
 
 };
 export type PageUpdateSubscriptionResult = void;
+export type PageClockInstallParams = {
+  now?: number,
+};
+export type PageClockInstallOptions = {
+  now?: number,
+};
+export type PageClockInstallResult = void;
+export type PageClockTickParams = {
+  time: number,
+};
+export type PageClockTickOptions = {
+
+};
+export type PageClockTickResult = void;
+export type PageClockSetTimeParams = {
+  now: number,
+};
+export type PageClockSetTimeOptions = {
+
+};
+export type PageClockSetTimeResult = void;
+export type PageClockUninstallParams = {};
+export type PageClockUninstallOptions = {};
+export type PageClockUninstallResult = void;
 
 export interface PageEvents {
   'bindingCall': PageBindingCallEvent;

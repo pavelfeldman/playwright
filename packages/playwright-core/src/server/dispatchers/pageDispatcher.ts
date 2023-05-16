@@ -265,6 +265,22 @@ export class PageDispatcher extends Dispatcher<Page, channels.PageChannel, Brows
     return { rootAXNode: rootAXNode || undefined };
   }
 
+  async clockInstall(params: channels.PageClockInstallParams, metadata?: CallMetadata | undefined) {
+    await this._page.clock.install(params.now);
+  }
+
+  async clockTick(params: channels.PageClockTickParams, metadata?: CallMetadata | undefined) {
+    await this._page.clock.tick(params.time);
+  }
+
+  async clockSetTime(params: channels.PageClockSetTimeParams, metadata?: CallMetadata | undefined) {
+    await this._page.clock.setTime(params.now);
+  }
+
+  async clockUninstall(params?: channels.PageClockUninstallParams | undefined, metadata?: CallMetadata | undefined) {
+    await this._page.clock.uninstall();
+  }
+
   async pdf(params: channels.PagePdfParams, metadata: CallMetadata): Promise<channels.PagePdfResult> {
     if (!this._page.pdf)
       throw new Error('PDF generation is only supported for Headless Chromium');
