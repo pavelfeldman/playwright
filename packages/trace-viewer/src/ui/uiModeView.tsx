@@ -518,9 +518,9 @@ const TraceView: React.FC<{
     }
 
     // Test finished.
-    const attachment = result && result.duration >= 0 && result.attachments.find(a => a.name === 'trace');
-    if (attachment && attachment.path) {
-      loadSingleTraceFile(attachment.path).then(model => setModel({ model, isLive: false }));
+    const attachments = result && result.duration >= 0 ? result.attachments.filter(a => a.name === 'trace' && a.path) : [];
+    if (attachments.length) {
+      loadTraceFiles(attachments.map(a => a.path!)).then(model => setModel({ model, isLive: false }));
       return;
     }
 
@@ -533,7 +533,7 @@ const TraceView: React.FC<{
     // Start polling running test.
     pollTimer.current = setTimeout(async () => {
       try {
-        const model = await loadSingleTraceFile(traceLocation);
+        const model = await loadTraceFiles([traceLocation]);
         setModel({ model, isLive: true });
       } catch {
         setModel(undefined);
@@ -962,12 +962,16 @@ function hideOnlyTests(rootItem: GroupItem) {
   visit(rootItem);
 }
 
-async function loadSingleTraceFile(url: string): Promise<MultiTraceModel> {
-  const params = new URLSearchParams();
-  params.set('trace', url);
-  const response = await fetch(`contexts?${params.toString()}`);
-  const contextEntries = await response.json() as ContextEntry[];
-  return new MultiTraceModel(contextEntries);
+async function loadTraceFiles(urls: string[]): Promise<MultiTraceModel> {
+  const allContexts: ContextEntry[] = [];
+  for (const url of urls) {
+    const params = new URLSearchParams();
+    params.set('trace', url);
+    const response = await fetch(`contexts?${params.toString()}`);
+    const contextEntries = await response.json() as ContextEntry[];
+    allContexts.push(...contextEntries);
+  }
+  return new MultiTraceModel(allContexts);
 }
 
 const pathSeparator = navigator.userAgent.toLowerCase().includes('windows') ? '\\' : '/';

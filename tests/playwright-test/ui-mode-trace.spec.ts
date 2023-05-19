@@ -104,7 +104,6 @@ test('should merge screenshot assertions', async ({  runUITest }, testInfo) => {
     /After Hooks-/,
     /fixture: page[\d.]+m?s/,
     /fixture: context[\d.]+m?s/,
-    /fixture: browser[\d.]+m?s/,
   ]);
 });
 
