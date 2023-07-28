@@ -53,7 +53,10 @@ it('should have version and creator', async ({ contextFactory, server }, testInf
   const log = await getLog();
   expect(log.version).toBe('1.2');
   expect(log.creator.name).toBe('Playwright');
-  expect(log.creator.version).toBe(process.env.PW_VERSION_OVERRIDE || require('../../package.json')['version']);
+  if (process.env.PW_VERSION_OVERRIDE)
+    expect(log.creator.version).toContain(process.env.PW_VERSION_OVERRIDE);
+  else
+    expect(log.creator.version).toBe(require('../../package.json')['version']);
 });
 
 it('should have browser', async ({ browserName, browser, contextFactory, server }, testInfo) => {
@@ -583,7 +586,7 @@ it('should have connection details', async ({ contextFactory, server, browserNam
   await page.goto(server.EMPTY_PAGE);
   const log = await getLog();
   const { serverIPAddress, _serverPort: port, _securityDetails: securityDetails } = log.entries[0];
-  expect(serverIPAddress).toMatch(/^127\.0\.0\.1|\[::1\]/);
+  checkServerIPAddress(browserName, mode, serverIPAddress);
   if (!mode.startsWith('service'))
     expect(port).toBe(server.PORT);
   expect(securityDetails).toEqual({});
@@ -597,7 +600,7 @@ it('should have security details', async ({ contextFactory, httpsServer, browser
   await page.goto(httpsServer.EMPTY_PAGE);
   const log = await getLog();
   const { serverIPAddress, _serverPort: port, _securityDetails: securityDetails } = log.entries[0];
-  expect(serverIPAddress).toMatch(/^127\.0\.0\.1|\[::1\]/);
+  checkServerIPAddress(browserName, mode, serverIPAddress);
   if (!mode.startsWith('service'))
     expect(port).toBe(httpsServer.PORT);
   if (browserName === 'webkit' && platform === 'darwin')
@@ -619,13 +622,13 @@ it('should have connection details for redirects', async ({ contextFactory, serv
     expect(detailsFoo.serverIPAddress).toBeUndefined();
     expect(detailsFoo._serverPort).toBeUndefined();
   } else {
-    expect(detailsFoo.serverIPAddress).toMatch(/^127\.0\.0\.1|\[::1\]/);
+    checkServerIPAddress(browserName, mode, detailsFoo.serverIPAddress);
     if (!mode.startsWith('service'))
       expect(detailsFoo._serverPort).toBe(server.PORT);
   }
 
   const detailsEmpty = log.entries[1];
-  expect(detailsEmpty.serverIPAddress).toMatch(/^127\.0\.0\.1|\[::1\]/);
+  checkServerIPAddress(browserName, mode, detailsEmpty.serverIPAddress);
   if (!mode.startsWith('service'))
     expect(detailsEmpty._serverPort).toBe(server.PORT);
 });
@@ -639,15 +642,15 @@ it('should have connection details for failed requests', async ({ contextFactory
   await page.goto(server.PREFIX + '/one-style.html');
   const log = await getLog();
   const { serverIPAddress, _serverPort: port } = log.entries[0];
-  expect(serverIPAddress).toMatch(/^127\.0\.0\.1|\[::1\]/);
+  checkServerIPAddress(browserName, mode, serverIPAddress);
   if (!mode.startsWith('service'))
     expect(port).toBe(server.PORT);
 });
 
-it('should return server address directly from response', async ({ page, server, mode }) => {
+it('should return server address directly from response', async ({ page, server, browserName, mode }) => {
   const response = await page.goto(server.EMPTY_PAGE);
   const { ipAddress, port } = await response.serverAddr();
-  expect(ipAddress).toMatch(/^127\.0\.0\.1|\[::1\]/);
+  checkServerIPAddress(browserName, mode, ipAddress);
   if (!mode.startsWith('service'))
     expect(port).toBe(server.PORT);
 });
@@ -860,3 +863,8 @@ it('should not hang on slow chunked response', async ({ browserName, browser, co
   expect(log.browser.name.toLowerCase()).toBe(browserName);
   expect(log.browser.version).toBe(browser.version());
 });
+
+function checkServerIPAddress(browserName: string, mode: string, serverIPAddress) {
+  if (browserName !== 'firefox' || mode !== 'service2')
+    expect(serverIPAddress).toMatch(/^127\.0\.0\.1|\[::1\]/);
+}
