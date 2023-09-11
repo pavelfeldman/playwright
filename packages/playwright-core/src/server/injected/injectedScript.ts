@@ -676,7 +676,7 @@ export class InjectedScript {
       throw this.createStacklessError('Element is not a <select> element');
     const select = element as HTMLSelectElement;
     const options = [...select.options];
-    const selectedOptions = [];
+    const selectedOptions: HTMLOptionElement[] = [];
     let remainingOptionsToSelect = optionsToSelect.slice();
     for (let index = 0; index < options.length; index++) {
       const option = options[index];
@@ -1048,7 +1048,7 @@ export class InjectedScript {
       return oneLine(`<${node.nodeName.toLowerCase()} />`);
     const element = node as Element;
 
-    const attrs = [];
+    const attrs: string[] = [];
     for (let i = 0; i < element.attributes.length; i++) {
       const { name, value } = element.attributes[i];
       if (name === 'style')
@@ -1107,7 +1107,7 @@ export class InjectedScript {
       this.hideHighlight();
     this._highlight = new Highlight(this);
     this._highlight.install();
-    const elements = [];
+    const elements: Element[][] = [];
     for (const selector of selectors)
       elements.push(this.querySelectorAll(selector, this.document.documentElement));
     this._highlight.maskElements(elements.flat(), color);
@@ -1433,22 +1433,23 @@ function cssUnquote(s: string): string {
 }
 
 function createTextMatcher(selector: string, internal: boolean): { matcher: TextMatcher, kind: 'regex' | 'strict' | 'lax' } {
-  if (selector[0] === '/' && selector.lastIndexOf('/') > 0) {
-    const lastSlash = selector.lastIndexOf('/');
-    const re = new RegExp(selector.substring(1, lastSlash), selector.substring(lastSlash + 1));
-    return { matcher: (elementText: ElementText) => re.test(elementText.full), kind: 'regex' };
-  }
   const unquote = internal ? JSON.parse.bind(JSON) : cssUnquote;
   let strict = false;
   if (selector.length > 1 && selector[0] === '"' && selector[selector.length - 1] === '"') {
     selector = unquote(selector);
     strict = true;
-  } else if (internal && selector.length > 1 && selector[0] === '"' && selector[selector.length - 2] === '"' && selector[selector.length - 1] === 'i') {
-    selector = unquote(selector.substring(0, selector.length - 1));
-    strict = false;
-  } else if (internal && selector.length > 1 && selector[0] === '"' && selector[selector.length - 2] === '"' && selector[selector.length - 1] === 's') {
-    selector = unquote(selector.substring(0, selector.length - 1));
-    strict = true;
+  } else if (internal && selector.length > 1 && selector[0] === '"') {
+    if (selector[selector.length - 2] === '"' && selector[selector.length - 1] === 'i') {
+      selector = unquote(selector.substring(0, selector.length - 1));
+      strict = false;
+    } else if (selector[selector.length - 2] === '"' && selector[selector.length - 1] === 's') {
+      selector = unquote(selector.substring(0, selector.length - 1));
+      strict = true;
+    } else if (selector.match(/.*\"r[dgimsuy]*/)) {
+      const lastIndexOfQuote = selector.lastIndexOf('"');
+      const re = new RegExp(selector.substring(1, lastIndexOfQuote), selector.substring(lastIndexOfQuote + 2));
+      return { matcher: (elementText: ElementText) => re.test(elementText.full), kind: 'regex' };
+    }
   } else if (selector.length > 1 && selector[0] === "'" && selector[selector.length - 1] === "'") {
     selector = unquote(selector);
     strict = true;

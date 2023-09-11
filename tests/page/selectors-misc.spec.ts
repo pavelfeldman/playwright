@@ -483,3 +483,8 @@ it('chaining should work with large DOM @smoke', async ({ page, server }) => {
   // Uncomment to see performance results.
   // console.log(times);
 });
+
+it('should work with internal:has-text=/a\'b/', async ({ page, server }) => {
+  await page.setContent(`<div>let's <span>go</span></div>`);
+  await page.locator('div', { hasText: /let's/ }).locator('span').click();
+});

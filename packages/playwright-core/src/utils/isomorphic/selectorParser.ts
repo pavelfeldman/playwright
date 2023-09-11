@@ -388,6 +388,17 @@ export function parseAttributeSelector(selector: string, allowUnquotedStrings: b
       } else if (next() === 's' || next() === 'S') {
         caseSensitive = true;
         eat1();
+      } else if (next() === 'r') {
+        let flags = '';
+        eat1();
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions
+        while (!EOL && next().match(/[dgimsuy]/))
+          flags += eat1();
+        try {
+          value = new RegExp(value, flags);
+        } catch (e) {
+          throw new InvalidSelectorError(`Error while parsing selector \`${selector}\`: ${e.message}`);
+        }
       }
     } else {
       value = '';
