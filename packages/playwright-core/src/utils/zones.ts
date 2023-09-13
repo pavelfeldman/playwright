@@ -23,8 +23,8 @@ class ZoneManager {
   lastZoneId = 0;
   readonly _zones = new Map<number, Zone<any>>();
 
-  run<T, R>(type: ZoneType, data: T, func: (data: T) => R): R {
-    return new Zone<T>(this, ++this.lastZoneId, type, data).run(func);
+  run<T, R>(type: ZoneType, data: T, func: (data: T) => R, boxInternals?: boolean): R {
+    return new Zone<T>(this, ++this.lastZoneId, type, data, boxInternals || false).run(func);
   }
 
   zoneData<T>(type: ZoneType, rawStack: RawStack): T | null {
@@ -36,6 +36,30 @@ class ZoneManager {
       }
     }
     return null;
+  }
+
+  outermostZoneData<T>(type: ZoneType, rawStack: RawStack): T | null {
+    for (let index = rawStack.length - 1; index >= 0; --index) {
+      const line = rawStack[index];
+      for (const zoneId of zoneIds(line)) {
+        const zone = this._zones.get(zoneId);
+        if (zone && zone.type === type)
+          return zone.data;
+      }
+    }
+    return null;
+  }
+
+  hideBoxedFrames(rawStack: RawStack): RawStack {
+    for (let index = rawStack.length - 1; index >= 0; --index) {
+      const line = rawStack[index];
+      for (const zoneId of zoneIds(line)) {
+        const zone = this._zones.get(zoneId);
+        if (zone && zone.boxInternals)
+          return rawStack.slice(index);
+      }
+    }
+    return rawStack;
   }
 
   preserve<T>(callback: () => Promise<T>): Promise<T> {
@@ -61,13 +85,15 @@ class Zone<T> {
   readonly type: ZoneType;
   data: T;
   readonly wallTime: number;
+  readonly boxInternals: boolean;
 
-  constructor(manager: ZoneManager, id: number, type: ZoneType, data: T) {
+  constructor(manager: ZoneManager, id: number, type: ZoneType, data: T, boxInternals: boolean) {
     this._manager = manager;
     this.id = id;
     this.type = type;
     this.data = data;
     this.wallTime = Date.now();
+    this.boxInternals = boxInternals;
   }
 
   run<R>(func: (data: T) => R): R {

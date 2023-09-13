@@ -15,6 +15,7 @@
  */
 
 import {
+  captureLibraryStackTrace,
   captureRawStack,
   isString,
   pollAgainstDeadline } from 'playwright-core/lib/utils';
@@ -129,6 +130,9 @@ function createExpect(info: ExpectMetaInfo) {
       if (property === 'configure')
         return configure;
 
+      if (property === 'wrap')
+        return wrap;
+
       if (property === 'soft') {
         return (actual: unknown, messageOrOptions?: ExpectMessage) => {
           return configure({ soft: true })(actual, messageOrOptions) as any;
@@ -144,6 +148,26 @@ function createExpect(info: ExpectMetaInfo) {
       return (expectLibrary as any)[property];
     },
   });
+
+  const wrap = (title: string, callback: (...args: any) => Promise<void>) => {
+    const result = async (...args: any) => {
+      const testInfo = currentTestInfo();
+      if (testInfo) {
+        // Add expect zone to alias the protocol calls.
+        const expectZone: ExpectZone = { title, wallTime: Date.now() };
+        await zones.run<ExpectZone, any>('expectZone', expectZone, async () => {
+          // Annotate step as hidden to hide stack frames above this one.
+          const frames = captureLibraryStackTrace().frames;
+          await testInfo._runAsStep({ ...expectZone, category: 'expect', location: frames[0], boxInternals: true }, async () => {
+            await callback(...args);
+          });
+        }, true);
+      } else {
+        await callback(...args);
+      }
+    };
+    return result;
+  };
 
   const configure = (configuration: { message?: string, timeout?: number, soft?: boolean, _poll?: boolean | { timeout?: number, intervals?: number[] } }) => {
     const newInfo = { ...info };

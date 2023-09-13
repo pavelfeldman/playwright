@@ -41,6 +41,7 @@ export interface TestStepInternal {
   params?: Record<string, any>;
   error?: TestInfoError;
   infectParentStepsWithError?: boolean;
+  boxInternals?: boolean;
 }
 
 export class TestInfoImpl implements TestInfo {
@@ -262,6 +263,15 @@ export class TestInfoImpl implements TestInfo {
       isLaxParent = !!parentStep;
     }
 
+    if (parentStep && parentStep.boxInternals) {
+      return {
+        stepId,
+        ...data,
+        steps: [],
+        complete: () => {},
+      };
+    }
+
     const step: TestStepInternal = {
       stepId,
       ...data,
@@ -348,8 +358,8 @@ export class TestInfoImpl implements TestInfo {
     this.errors.push(error);
   }
 
-  async _runAsStep<T>(stepInfo: Omit<TestStepInternal, 'complete' | 'wallTime' | 'parentStepId' | 'stepId' | 'steps'>, cb: (step: TestStepInternal) => Promise<T>): Promise<T> {
-    const step = this._addStep({ ...stepInfo, wallTime: Date.now() });
+  async _runAsStep<T>(stepInfo: Omit<TestStepInternal, 'complete' | 'wallTime' | 'parentStepId' | 'stepId' | 'steps'> & { wallTime?: number }, cb: (step: TestStepInternal) => Promise<T>, boxInternals?: boolean): Promise<T> {
+    const step = this._addStep({ wallTime: Date.now(), ...stepInfo });
     return await zones.run('stepZone', step, async () => {
       try {
         const result = await cb(step);
@@ -359,7 +369,7 @@ export class TestInfoImpl implements TestInfo {
         step.complete({ error: e instanceof SkipError ? undefined : serializeError(e) });
         throw e;
       }
-    });
+    }, boxInternals);
   }
 
   _isFailure() {

@@ -159,7 +159,7 @@ export abstract class ChannelOwner<T extends channels.Channel = channels.Channel
 
   async _wrapApiCall<R>(func: (apiZone: ApiZone) => Promise<R>, isInternal = false): Promise<R> {
     const logger = this._logger;
-    const stack = captureRawStack();
+    const stack = zones.hideBoxedFrames(captureRawStack());
     const apiZone = zones.zoneData<ApiZone>('apiZone', stack);
     if (apiZone)
       return func(apiZone);
@@ -170,7 +170,7 @@ export abstract class ChannelOwner<T extends channels.Channel = channels.Channel
       delete stackTrace.apiName;
 
     // Enclosing zone could have provided the apiName and wallTime.
-    const expectZone = zones.zoneData<ExpectZone>('expectZone', stack);
+    const expectZone = zones.outermostZoneData<ExpectZone>('expectZone', stack);
     const wallTime = expectZone ? expectZone.wallTime : Date.now();
     if (!isInternal && expectZone)
       stackTrace.apiName = expectZone.title;

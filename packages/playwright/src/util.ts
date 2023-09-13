@@ -23,7 +23,7 @@ import url from 'url';
 import { colors, debug, minimatch, parseStackTraceLine } from 'playwright-core/lib/utilsBundle';
 import type { TestInfoError } from './../types/test';
 import type { Location } from './../types/testReporter';
-import { calculateSha1, isRegExp, isString, sanitizeForFilePath } from 'playwright-core/lib/utils';
+import { calculateSha1, isRegExp, isString, sanitizeForFilePath, zones } from 'playwright-core/lib/utils';
 import type { RawStack } from 'playwright-core/lib/utils';
 
 const PLAYWRIGHT_TEST_PATH = path.join(__dirname, '..');
@@ -50,7 +50,7 @@ export function filterStackFile(file: string) {
 
 export function filteredStackTrace(rawStack: RawStack): StackFrame[] {
   const frames: StackFrame[] = [];
-  for (const line of rawStack) {
+  for (const line of zones.hideBoxedFrames(rawStack)) {
     const frame = parseStackTraceLine(line);
     if (!frame || !frame.file)
       continue;

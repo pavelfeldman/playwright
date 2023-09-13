@@ -401,6 +401,7 @@ export type Expect = {
     promise?: string;
     utils: any;
   };
+  wrap: <T extends Function>(callback: T) => T;
   not: Omit<AsymmetricMatchers, 'any' | 'anything'>;
 } & AsymmetricMatchers;
 
