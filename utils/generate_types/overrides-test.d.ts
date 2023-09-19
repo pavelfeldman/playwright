@@ -294,33 +294,39 @@ interface AsymmetricMatchers {
   stringMatching(sample: string | RegExp): AsymmetricMatcher;
 }
 
-interface GenericAssertions<R> {
-  not: GenericAssertions<R>;
-  toBe(expected: unknown): R;
-  toBeCloseTo(expected: number, numDigits?: number): R;
-  toBeDefined(): R;
-  toBeFalsy(): R;
-  toBeGreaterThan(expected: number | bigint): R;
-  toBeGreaterThanOrEqual(expected: number | bigint): R;
-  toBeInstanceOf(expected: Function): R;
-  toBeLessThan(expected: number | bigint): R;
-  toBeLessThanOrEqual(expected: number | bigint): R;
-  toBeNaN(): R;
-  toBeNull(): R;
-  toBeTruthy(): R;
-  toBeUndefined(): R;
-  toContain(expected: string): R;
-  toContain(expected: unknown): R;
-  toContainEqual(expected: unknown): R;
-  toEqual(expected: unknown): R;
-  toHaveLength(expected: number): R;
-  toHaveProperty(keyPath: string | Array<string>, value?: unknown): R;
-  toMatch(expected: RegExp | string): R;
-  toMatchObject(expected: Record<string, unknown> | Array<unknown>): R;
-  toStrictEqual(expected: unknown): R;
-  toThrow(error?: unknown): R;
-  toThrowError(error?: unknown): R;
+interface GenericAssertionsSource<R> {
+  toBe(receiver: any, expected: unknown): R;
+  toBeCloseTo(receiver: number, expected: number, numDigits?: number): R;
+  toBeDefined(receiver: any): R;
+  toBeFalsy(receiver: any): R;
+  toBeGreaterThan(receiver: number, expected: number | bigint): R;
+  toBeGreaterThanOrEqual(receiver: number, expected: number | bigint): R;
+  toBeInstanceOf(receiver: any, expected: Function): R;
+  toBeLessThan(receiver: number, expected: number | bigint): R;
+  toBeLessThanOrEqual(receiver: number, expected: number | bigint): R;
+  toBeNaN(receiver: number): R;
+  toBeNull(receiver: any): R;
+  toBeTruthy(receiver: any): R;
+  toBeUndefined(receiver: any): R;
+  toContain(receiver: string, expected: string): R;
+  toContain(receiver: Array<unknown>, expected: unknown): R;
+  toContainEqual(receiver: Array<unknown>, expected: unknown): R;
+  toEqual(receiver: any, expected: unknown): R;
+  toHaveLength(receiver: string | Array<unknown>, expected: number): R;
+  toHaveProperty(receiver: Record<string, unknown>, keyPath: string | Array<string>, value?: unknown): R;
+  toMatch(receiver: string, expected: RegExp | string): R;
+  toMatchObject(receiver: Record<string, unknown>, expected: Record<string, unknown> | Array<unknown>): R;
+  toStrictEqual(receiver: any, expected: unknown): R;
+  toThrow(receiver: Function, error?: unknown): R;
+  toThrowError(receiver: Function, error?: unknown): R;
 }
+
+type TrimFirstArg<F> = F extends (a: any, ...args: infer Rest) => infer R ? (...args: Rest) => R : never;
+type TrimFirstArgOf<T, ArgType> = T extends (arg: ArgType, ...rest: any[]) => any ? TrimFirstArg<T> : never;
+type FilterMethodsByFirstArg<T, ArgType> = {
+  [K in keyof T as T[K] extends (arg: ArgType, ...rest: any[]) => any ? K : never]: TrimFirstArgOf<T[K], ArgType>;
+};
+type GenericAssertions<R, T> = FilterMethodsByFirstArg<GenericAssertionsSource<R>, T>;
 
 type FunctionAssertions = {
   /**
@@ -329,8 +335,8 @@ type FunctionAssertions = {
   toPass(options?: { timeout?: number, intervals?: number[] }): Promise<void>;
 };
 
-type BaseMatchers<R, T> = GenericAssertions<R> & PlaywrightTest.Matchers<R, T> & SnapshotAssertions;
-type AllowedGenericMatchers<R, T> = PlaywrightTest.Matchers<R, T> & Pick<GenericAssertions<R>, 'toBe' | 'toBeDefined' | 'toBeFalsy' | 'toBeNull' | 'toBeTruthy' | 'toBeUndefined'>;
+type BaseMatchers<R, T> = GenericAssertions<R, T> & PlaywrightTest.Matchers<R, T> & SnapshotAssertions;
+type AllowedGenericMatchers<R, T> = PlaywrightTest.Matchers<R, T> & GenericAssertions<R, T>;
 
 type SpecificMatchers<R, T> =
   T extends Page ? PageAssertions & AllowedGenericMatchers<R, T> :

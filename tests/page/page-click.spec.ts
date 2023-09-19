@@ -17,6 +17,7 @@
 
 import { test as it, expect } from './pageTest';
 import { attachFrame, detachFrame } from '../config/utils';
+import type { Locator } from 'playwright-core';
 
 async function giveItAChanceToClick(page) {
   for (let i = 0; i < 5; i++)
@@ -26,6 +27,7 @@ async function giveItAChanceToClick(page) {
 it('should click the button @smoke', async ({ page, server }) => {
   await page.goto(server.PREFIX + '/input/button.html');
   await page.click('button');
+  await expect(page).toBeAttached(1);
   expect(await page.evaluate('result')).toBe('Clicked');
 });
 

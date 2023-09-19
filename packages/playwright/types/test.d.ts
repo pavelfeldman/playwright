@@ -4610,6 +4610,13 @@ interface AsymmetricMatchers {
   stringMatching(sample: string | RegExp): AsymmetricMatcher;
 }
 
+'toBe'
+'toBeDefined'
+'toBeFalsy'
+'toBeNull'
+'toBeTruthy'
+'toBeUndefined'
+
 /**
  * The {@link GenericAssertions} class provides assertion methods that can be used to make assertions about any values
  * in the tests. A new instance of {@link GenericAssertions} is created by calling
@@ -4651,7 +4658,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected value.
    */
-  toBe(expected: unknown): R;
+  toBe(receiver: any, expected: unknown): R;
   /**
    * Compares floating point numbers for approximate equality. Use this method instead of
    * [genericAssertions.toBe(expected)](https://playwright.dev/docs/api/class-genericassertions#generic-assertions-to-be)
@@ -4667,7 +4674,7 @@ interface GenericAssertions<R> {
    * @param expected Expected value.
    * @param numDigits The number of decimal digits after the decimal point that must be equal.
    */
-  toBeCloseTo(expected: number, numDigits?: number): R;
+  toBeCloseTo(receiver: number, expected: number, numDigits?: number): R;
   /**
    * Ensures that value is not `undefined`.
    *
@@ -4679,7 +4686,7 @@ interface GenericAssertions<R> {
    * ```
    *
    */
-  toBeDefined(): R;
+  toBeDefined(receiver: any): R;
   /**
    * Ensures that value is false in a boolean context, one of `false`, `0`, `''`, `null`, `undefined` or `NaN`. Use this
    * method when you don't care about the specific value.
@@ -4692,7 +4699,7 @@ interface GenericAssertions<R> {
    * ```
    *
    */
-  toBeFalsy(): R;
+  toBeFalsy(receiver: any): R;
   /**
    * Ensures that `value > expected` for number or big integer values.
    *
@@ -4705,7 +4712,7 @@ interface GenericAssertions<R> {
    *
    * @param expected The value to compare to.
    */
-  toBeGreaterThan(expected: number | bigint): R;
+  toBeGreaterThan(receiver: number, expected: number | bigint): R;
   /**
    * Ensures that `value >= expected` for number or big integer values.
    *
@@ -4718,7 +4725,7 @@ interface GenericAssertions<R> {
    *
    * @param expected The value to compare to.
    */
-  toBeGreaterThanOrEqual(expected: number | bigint): R;
+  toBeGreaterThanOrEqual(receiver: number, expected: number | bigint): R;
   /**
    * Ensures that value is an instance of a class. Uses `instanceof` operator.
    *
@@ -4733,7 +4740,7 @@ interface GenericAssertions<R> {
    *
    * @param expected The class or constructor function.
    */
-  toBeInstanceOf(expected: Function): R;
+  toBeInstanceOf(receiver: any, expected: Function): R;
   /**
    * Ensures that `value < expected` for number or big integer values.
    *
@@ -4746,7 +4753,7 @@ interface GenericAssertions<R> {
    *
    * @param expected The value to compare to.
    */
-  toBeLessThan(expected: number | bigint): R;
+  toBeLessThan(receiver: number, expected: number | bigint): R;
   /**
    * Ensures that `value <= expected` for number or big integer values.
    *
@@ -4759,7 +4766,7 @@ interface GenericAssertions<R> {
    *
    * @param expected The value to compare to.
    */
-  toBeLessThanOrEqual(expected: number | bigint): R;
+  toBeLessThanOrEqual(receiver: number, expected: number | bigint): R;
   /**
    * Ensures that value is `NaN`.
    *
@@ -4771,7 +4778,7 @@ interface GenericAssertions<R> {
    * ```
    *
    */
-  toBeNaN(): R;
+  toBeNaN(receiver: number): R;
   /**
    * Ensures that value is `null`.
    *
@@ -4783,7 +4790,7 @@ interface GenericAssertions<R> {
    * ```
    *
    */
-  toBeNull(): R;
+  toBeNull(receiver: any): R;
   /**
    * Ensures that value is true in a boolean context, **anything but** `false`, `0`, `''`, `null`, `undefined` or `NaN`.
    * Use this method when you don't care about the specific value.
@@ -4796,7 +4803,7 @@ interface GenericAssertions<R> {
    * ```
    *
    */
-  toBeTruthy(): R;
+  toBeTruthy(receiver: any): R;
   /**
    * Ensures that value is `undefined`.
    *
@@ -4808,7 +4815,7 @@ interface GenericAssertions<R> {
    * ```
    *
    */
-  toBeUndefined(): R;
+  toBeUndefined(receiver: any): R;
   /**
    * Ensures that string value contains an expected substring. Comparison is case-sensitive.
    *
@@ -4822,7 +4829,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected substring.
    */
-  toContain(expected: string): R;
+  toContain(receiver: string, expected: string): R;
   /**
    * Ensures that value is an `Array` or `Set` and contains an expected item.
    *
@@ -4836,7 +4843,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected value in the collection.
    */
-  toContain(expected: unknown): R;
+  toContain(receiver: Array<unknown>, expected: unknown): R;
   /**
    * Ensures that value is an `Array` or `Set` and contains an item equal to the expected.
    *
@@ -4861,7 +4868,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected value in the collection.
    */
-  toContainEqual(expected: unknown): R;
+  toContainEqual(receiver: Array<unknown>, expected: unknown): R;
   /**
    * Compares contents of the value with contents of `expected`, performing "deep equality" check.
    *
@@ -4920,7 +4927,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected value.
    */
-  toEqual(expected: unknown): R;
+  toEqual(receiver: any, expected: unknown): R;
   /**
    * Ensures that value has a `.length` property equal to `expected`. Useful for arrays and strings.
    *
@@ -4933,7 +4940,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected length.
    */
-  toHaveLength(expected: number): R;
+  toHaveLength(receiver: string | Array<unknown>, expected: number): R;
   /**
    * Ensures that property at provided `keyPath` exists on the object and optionally checks that property is equal to
    * the `expected`. Equality is checked recursively, similarly to
@@ -4959,7 +4966,7 @@ interface GenericAssertions<R> {
    * array items.
    * @param expected Optional expected value to compare the property to.
    */
-  toHaveProperty(keyPath: string | Array<string>, value?: unknown): R;
+  toHaveProperty(receiver: Record<string, unknown>, keyPath: string | Array<string>, value?: unknown): R;
   /**
    * Ensures that string value matches a regular expression.
    *
@@ -4972,7 +4979,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Regular expression to match against.
    */
-  toMatch(expected: RegExp | string): R;
+  toMatch(receiver: string, expected: RegExp | string): R;
   /**
    * Compares contents of the value with contents of `expected`, performing "deep equality" check. Allows extra
    * properties to be present in the value, unlike
@@ -4997,7 +5004,7 @@ interface GenericAssertions<R> {
    *
    * @param expected The expected object value to match against.
    */
-  toMatchObject(expected: Record<string, unknown> | Array<unknown>): R;
+  toMatchObject(receiver: Record<string, unknown>, expected: Record<string, unknown> | Array<unknown>): R;
   /**
    * Compares contents of the value with contents of `expected` **and** their types.
    *
@@ -5017,7 +5024,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected value.
    */
-  toStrictEqual(expected: unknown): R;
+  toStrictEqual(receiver: any, expected: unknown): R;
   /**
    * Calls the function and ensures it throws an error.
    *
@@ -5045,7 +5052,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected error message or error object.
    */
-  toThrow(error?: unknown): R;
+  toThrow(receiver: Function, error?: unknown): R;
   /**
    * An alias for
    * [genericAssertions.toThrow([expected])](https://playwright.dev/docs/api/class-genericassertions#generic-assertions-to-throw).
@@ -5060,7 +5067,7 @@ interface GenericAssertions<R> {
    *
    * @param expected Expected error message or error object.
    */
-  toThrowError(error?: unknown): R;
+  toThrowError(receiver: Function, error?: unknown): R;
 
 }
 
