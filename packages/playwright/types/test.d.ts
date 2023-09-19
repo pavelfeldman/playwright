@@ -3363,7 +3363,7 @@ export interface TestType<TestArgs extends KeyValue, WorkerArgs extends KeyValue
    * ```
    *
    */
-  expect: Expect;
+  expect: Expect<{}>;
   /**
    * Extends the `test` object by defining fixtures and/or options that can be used in the tests.
    *
@@ -5074,47 +5074,70 @@ type FunctionAssertions = {
 type BaseMatchers<R, T> = GenericAssertions<R> & PlaywrightTest.Matchers<R, T> & SnapshotAssertions;
 type AllowedGenericMatchers<R, T> = PlaywrightTest.Matchers<R, T> & Pick<GenericAssertions<R>, 'toBe' | 'toBeDefined' | 'toBeFalsy' | 'toBeNull' | 'toBeTruthy' | 'toBeUndefined'>;
 
-type SpecificMatchers<R, T> =
-  T extends Page ? PageAssertions & AllowedGenericMatchers<R, T> :
-  T extends Locator ? LocatorAssertions & AllowedGenericMatchers<R, T> :
+type SpecificMatchers<R, T, ExtendedMatchers> =
+  T extends Page ? PageAssertions & AllowedGenericMatchers<R, T> & TrimFirstArg<FilterByFirstArg<ExtendedMatchers, Page>> :
+  T extends Locator ? LocatorAssertions & AllowedGenericMatchers<R, T> & TrimFirstArg<FilterByFirstArg<ExtendedMatchers, Locator>> :
   T extends APIResponse ? APIResponseAssertions & AllowedGenericMatchers<R, T> :
   BaseMatchers<R, T> & (T extends Function ? FunctionAssertions : {});
 type AllMatchers<R, T> = PageAssertions & LocatorAssertions & APIResponseAssertions & FunctionAssertions & BaseMatchers<R, T>;
 
 type IfAny<T, Y, N> = 0 extends (1 & T) ? Y : N;
 type Awaited<T> = T extends PromiseLike<infer U> ? U : T;
-type MakeMatchers<R, T> = {
+type MakeMatchers<R, T, ExtendedMatchers> = {
   /**
    * If you know how to test something, `.not` lets you test its opposite.
    */
-  not: MakeMatchers<R, T>;
+  not: MakeMatchers<R, T, ExtendedMatchers>;
   /**
    * Use resolves to unwrap the value of a fulfilled promise so any other
    * matcher can be chained. If the promise is rejected the assertion fails.
    */
-  resolves: MakeMatchers<Promise<R>, Awaited<T>>;
+  resolves: MakeMatchers<Promise<R>, Awaited<T>, ExtendedMatchers>;
   /**
    * Unwraps the reason of a rejected promise so any other matcher can be chained.
    * If the promise is fulfilled the assertion fails.
    */
-  rejects: MakeMatchers<Promise<R>, any>;
-} & IfAny<T, AllMatchers<R, T>, SpecificMatchers<R, T>>;
+  rejects: MakeMatchers<Promise<R>, any, ExtendedMatchers>;
+} & IfAny<T, AllMatchers<R, T>, SpecificMatchers<R, T, ExtendedMatchers>>;
 
-export type Expect = {
-  <T = unknown>(actual: T, messageOrOptions?: string | { message?: string }): MakeMatchers<void, T>;
-  soft: <T = unknown>(actual: T, messageOrOptions?: string | { message?: string }) => MakeMatchers<void, T>;
+type SecondArg<F> = F extends (first: any, second: infer S, ...rest: any[]) => any ? S : any;
+type TailArgs<F> = F extends (a: any, ...args: infer Rest) => infer R ? (...args: Rest) => R : never;
+type HasFirstArgOfType<T, ArgType> = T extends (arg: ArgType, ...rest: any[]) => any ? T : never;
+type FilterByFirstArg<T, ArgType> = {
+  [K in keyof T]: HasFirstArgOfType<T[K], ArgType>;
+};
+type TrimFirstArg<Matchers> = {
+  [K in keyof Matchers]: TailArgs<Matchers[K]>;
+};
+type ChangeReturnType<F, NewReturn> = F extends (...args: infer Args) => any ? (...args: Args) => NewReturn : never;
+type ExtendedMatcherReturnType<T> = {
+  locator?: Locator;
+  name: string;
+  expected: T;
+  message?: () => string;
+  pass: boolean;
+  actual?: any;
+  log?: string[];
+};
+type MatchersWithChangedReturnType<Matchers> = {
+  [K in keyof Matchers]: ChangeReturnType<Matchers[K], Promise<ExtendedMatcherReturnType<SecondArg<Matchers[K]>>>>;
+};
+
+export type Expect<ExtendedMatchers> = {
+  <T = unknown>(actual: T, messageOrOptions?: string | { message?: string }): MakeMatchers<void, T, ExtendedMatchers>;
+  soft: <T = unknown>(actual: T, messageOrOptions?: string | { message?: string }) => MakeMatchers<void, T, ExtendedMatchers>;
   poll: <T = unknown>(actual: () => T | Promise<T>, messageOrOptions?: string | { message?: string, timeout?: number, intervals?: number[] }) => BaseMatchers<Promise<void>, T> & {
     /**
      * If you know how to test something, `.not` lets you test its opposite.
      */
      not: BaseMatchers<Promise<void>, T>;
   };
-  extend(matchers: any): void;
+  extend<MoreMatchers = unknown>(matchers: MatchersWithChangedReturnType<MoreMatchers>): Expect<ExtendedMatchers & MoreMatchers>;
   configure: (configuration: {
     message?: string,
     timeout?: number,
     soft?: boolean,
-  }) => Expect;
+  }) => Expect<ExtendedMatchers>;
   getState(): {
     expand?: boolean;
     isNot?: boolean;
@@ -5141,7 +5164,7 @@ export const test: TestType<PlaywrightTestArgs & PlaywrightTestOptions, Playwrig
 export default test;
 
 export const _baseTest: TestType<{}, {}>;
-export const expect: Expect;
+export const expect: Expect<{}>;
 
 /**
  * Defines Playwright config
