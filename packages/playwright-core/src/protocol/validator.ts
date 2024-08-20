@@ -1430,6 +1430,10 @@ scheme.FrameContentParams = tOptional(tObject({}));
 scheme.FrameContentResult = tObject({
   value: tString,
 });
+scheme.FrameStructuredContentParams = tOptional(tObject({}));
+scheme.FrameStructuredContentResult = tObject({
+  markup: tString,
+});
 scheme.FrameDragAndDropParams = tObject({
   source: tString,
   target: tString,

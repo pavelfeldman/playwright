@@ -74,7 +74,7 @@ export class JavaScriptLanguageGenerator implements LanguageGenerator {
     if (signals.download)
       formatter.add(`const download${signals.download.downloadAlias}Promise = ${pageAlias}.waitForEvent('download');`);
 
-    formatter.add(this._generateActionCall(subject, action));
+    formatter.add(wrapWithStep(action.command, this._generateActionCall(subject, action)));
 
     if (signals.popup)
       formatter.add(`const ${signals.popup.popupAlias} = await ${signals.popup.popupAlias}Promise;`);
@@ -275,4 +275,10 @@ export class JavaScriptFormatter {
 
 function quote(text: string) {
   return escapeWithQuotes(text, '\'');
+}
+
+function wrapWithStep(step: string | undefined, body: string) {
+  return step ? `await test.step(\`${step}\`, async () => {
+${body}
+});` : body;
 }

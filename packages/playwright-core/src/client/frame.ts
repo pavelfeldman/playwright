@@ -243,6 +243,12 @@ export class Frame extends ChannelOwner<channels.FrameChannel> implements api.Fr
     await this._channel.setContent({ html, ...options, waitUntil });
   }
 
+  async _structuredContent(): Promise<{ markup: string }> {
+    return await this._wrapApiCall(async () => {
+      return await this._channel.structuredContent();
+    }, true);
+  }
+
   name(): string {
     return this._name || '';
   }

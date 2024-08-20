@@ -921,6 +921,12 @@ export class Frame extends SdkObject {
     }, this._page._timeoutSettings.navigationTimeout(options));
   }
 
+  async structuredContent(): Promise<{ markup: string }> {
+    const context = await this._context('main');
+    const injectedScript = await context.injectedScript();
+    return await injectedScript.evaluate(injected => injected.structuredContent());
+  }
+
   name(): string {
     return this._name || '';
   }

@@ -1361,8 +1361,8 @@ function createSvgElement(doc: Document, { tagName, attrs, children }: SvgJson):
 }
 
 interface Embedder {
-  __pw_recorderPerformAction(action: actions.Action): Promise<void>;
-  __pw_recorderRecordAction(action: actions.Action): Promise<void>;
+  __pw_recorderPerformAction(action: actions.Action, elementInfo?: actions.ElementInfo): Promise<void>;
+  __pw_recorderRecordAction(action: actions.Action, elementInfo?: actions.ElementInfo): Promise<void>;
   __pw_recorderState(): Promise<UIState>;
   __pw_recorderSetSelector(selector: string): Promise<void>;
   __pw_recorderSetMode(mode: Mode): Promise<void>;
@@ -1408,11 +1408,13 @@ export class PollingRecorder implements RecorderDelegate {
   }
 
   async performAction(action: actions.Action) {
-    await this._embedder.__pw_recorderPerformAction(action);
+    const elementInfo = this._elementInfo(action);
+    await this._embedder.__pw_recorderPerformAction(action, elementInfo);
   }
 
   async recordAction(action: actions.Action): Promise<void> {
-    await this._embedder.__pw_recorderRecordAction(action);
+    const elementInfo = this._elementInfo(action);
+    await this._embedder.__pw_recorderRecordAction(action, elementInfo);
   }
 
   async setSelector(selector: string): Promise<void> {
@@ -1425,6 +1427,25 @@ export class PollingRecorder implements RecorderDelegate {
 
   async setOverlayState(state: OverlayState): Promise<void> {
     await this._embedder.__pw_recorderSetOverlayState(state);
+  }
+
+  private _elementInfo(action: actions.Action): actions.ElementInfo | undefined {
+    if (!('selector' in action))
+      return undefined;
+    const element = this._recorder.injectedScript.querySelector(this._recorder.injectedScript.parseSelector(action.selector), this._recorder.document.documentElement, true);
+    if (!element)
+      return undefined;
+
+    const { markup } = this._recorder.injectedScript.structuredContent();
+    const id = (element as any).__pw_structured_id as string;
+    const tag = (element as any).__pw_structured_tag as string;
+    if (!tag)
+      return undefined;
+    return {
+      markup,
+      tag,
+      id,
+    };
   }
 }
 

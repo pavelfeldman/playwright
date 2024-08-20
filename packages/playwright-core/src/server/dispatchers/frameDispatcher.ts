@@ -127,6 +127,13 @@ export class FrameDispatcher extends Dispatcher<Frame, channels.FrameChannel, Br
     return await this._frame.setContent(metadata, params.html, params);
   }
 
+  async structuredContent(): Promise<channels.FrameStructuredContentResult> {
+    const result = await this._frame.structuredContent();
+    return {
+      markup: result.markup,
+    };
+  }
+
   async addScriptTag(params: channels.FrameAddScriptTagParams, metadata: CallMetadata): Promise<channels.FrameAddScriptTagResult> {
     return { element: ElementHandleDispatcher.from(this, await this._frame.addScriptTag(params)) };
   }

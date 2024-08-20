@@ -36,7 +36,7 @@ import { RecorderApp } from './recorder/recorderApp';
 import type { CallMetadata, InstrumentationListener, SdkObject } from './instrumentation';
 import type { Point } from '../common/types';
 import type { CallLog, CallLogStatus, EventData, Mode, OverlayState, Source, UIState } from '@recorder/recorderTypes';
-import { createGuid, isUnderTest, monotonicTime } from '../utils';
+import { createGuid, isUnderTest, monotonicTime, normalizeWhiteSpace } from '../utils';
 import { metadataToCallLog } from './recorder/recorderUtils';
 import { Debugger } from './debugger';
 import { EventEmitter } from 'events';
@@ -45,6 +45,8 @@ import type { Language, LanguageGenerator } from './recorder/language';
 import { locatorOrSelectorAsSelector } from '../utils/isomorphic/locatorParser';
 import { quoteCSSAttributeValue, eventsHelper, type RegisteredListener } from '../utils';
 import type { Dialog } from './dialog';
+import * as prompts from './prompts';
+import { asString, llm } from './llm';
 
 type BindingSource = { frame: Frame, page: Page };
 
@@ -386,6 +388,7 @@ class ContextRecorder extends EventEmitter {
   private _throttledOutputFile: ThrottledFile | null = null;
   private _orderedLanguages: LanguageGenerator[] = [];
   private _listeners: RegisteredListener[] = [];
+  private _lastElement: { tag: string, description: string } | null = null;
 
   constructor(context: BrowserContext, params: channels.BrowserContextRecorderSupplementEnableParams) {
     super();
@@ -470,11 +473,11 @@ class ContextRecorder extends EventEmitter {
     // Input actions that potentially lead to navigation are intercepted on the page and are
     // performed by the Playwright.
     await this._context.exposeBinding('__pw_recorderPerformAction', false,
-        (source: BindingSource, action: actions.Action) => this._performAction(source.frame, action));
+        (source: BindingSource, action: actions.Action, elementInfo?: actions.ElementInfo) => this._performActionViaAI(source.frame, action, elementInfo));
 
     // Other non-essential actions are simply being recorded.
     await this._context.exposeBinding('__pw_recorderRecordAction', false,
-        (source: BindingSource, action: actions.Action) => this._recordAction(source.frame, action));
+        (source: BindingSource, action: actions.Action, elementInfo?: actions.ElementInfo) => this._recordActionViaAI(source.frame, action, elementInfo));
 
     await this._context.extendInjectedScript(recorderSource.source);
   }
@@ -648,6 +651,52 @@ class ContextRecorder extends EventEmitter {
     }
   }
 
+  private async _performActionViaAI(frame: Frame, action: actions.Action, elementInfo?: actions.ElementInfo) {
+    const supportedCommand = action.name === 'click' || action.name === 'press' || action.name === 'check' || action.name === 'uncheck' || action.name === 'select';
+    if (!elementInfo || !supportedCommand)
+      return this._performAction(frame, action);
+    const command = await this._createAndVerifyCommand(action, elementInfo);
+    if (command)
+      action.command = command;
+    return this._performAction(frame, action);
+  }
+
+  private async _recordActionViaAI(frame: Frame, action: actions.Action, elementInfo?: actions.ElementInfo) {
+    const supportedCommand = action.name === 'fill' || action.name === 'press';
+    if (!elementInfo || !supportedCommand)
+      return this._recordAction(frame, action);
+    const command = await this._createAndVerifyCommand(action, elementInfo);
+    if (command)
+      action.command = command;
+    return this._recordAction(frame, action);
+  }
+
+  private async _createAndVerifyCommand(action: actions.Action, elementInfo: actions.ElementInfo): Promise<string | null> {
+    if (this._lastElement && this._lastElement.tag === elementInfo.tag)
+      return constructCommand(action, this._lastElement.description.toLowerCase());
+
+    console.log('tag:', elementInfo.tag); // eslint-disable-line no-console
+    const description = normalizeWhiteSpace(await asString(await llm(prompts.describeElement(elementInfo))));
+    this._lastElement = { tag: elementInfo.tag, description };
+
+    console.log('description:', description); // eslint-disable-line no-console
+    const command = constructCommand(action, description.toLowerCase());
+
+    const response = await asString(await llm(prompts.pickAction(command, elementInfo.markup)));
+    try {
+      // strip markdown code frame
+      const stripped = response.replace(/```[^\n]*([\s\S]*?)```/g, '$1');
+      const parsedResponse = JSON.parse(stripped) as prompts.PickActionResponse;
+      console.log({ parsedResponse }); // eslint-disable-line no-console
+      if (parsedResponse.action !== action.name && parsedResponse.id !== elementInfo.id)
+        return null;
+      return command;
+    } catch (e) {
+      console.error('Invalid JSON', response); // eslint-disable-line no-console
+    }
+    return null;
+  }
+
   private async _recordAction(frame: Frame, action: actions.Action) {
     // Commit last action so that no further signals are added to it.
     this._generator.commitLastAction();
@@ -748,4 +797,22 @@ async function findFrameSelector(frame: Frame): Promise<string | undefined> {
     return selector;
   } catch (e) {
   }
+}
+
+function constructCommand(action: actions.Action, description: string): string {
+  switch (action.name) {
+    case 'click': {
+      if (action.clickCount === 2)
+        return `Double-click ${description}`;
+      if (action.button === 'right')
+        return `Right-click ${description}`;
+      return `Click ${description}`;
+    }
+    case 'fill': return `Fill ${description} with "${action.text}"`;
+    case 'press': return `Press "${action.key}" in ${description}`;
+    case 'select': return `Select "${action.options.join('", "')}" in ${description}`;
+    case 'check': return `Check ${description}`;
+    case 'uncheck': return `Uncheck ${description}`;
+  }
+  return `${action.name} ${description}`;
 }

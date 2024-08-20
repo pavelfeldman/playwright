@@ -29,11 +29,11 @@ import type { CSSComplexSelectorList } from '../../utils/isomorphic/cssParser';
 import { generateSelector, type GenerateSelectorOptions } from './selectorGenerator';
 import type * as channels from '@protocol/channels';
 import { Highlight } from './highlight';
-import { getChecked, getAriaDisabled, getAriaRole, getElementAccessibleName, getElementAccessibleDescription } from './roleUtils';
+import { getChecked, getAriaDisabled, getAriaRole, getElementAccessibleName, getElementAccessibleDescription, beginAriaCaches, endAriaCaches } from './roleUtils';
 import { kLayoutSelectorNames, type LayoutSelectorName, layoutSelectorScore } from './layoutSelectorUtils';
 import { asLocator } from '../../utils/isomorphic/locatorGenerators';
 import type { Language } from '../../utils/isomorphic/locatorGenerators';
-import { cacheNormalizedWhitespaces, normalizeWhiteSpace, trimStringWithEllipsis } from '../../utils/isomorphic/stringUtils';
+import { cacheNormalizedWhitespaces, normalizeWhiteSpace, renderTag, trimStringWithEllipsis } from '../../utils/isomorphic/stringUtils';
 
 export type FrameExpectParams = Omit<channels.FrameExpectParams, 'expectedValue'> & { expectedValue?: any };
 
@@ -120,8 +120,7 @@ export class InjectedScript {
     this._setupGlobalListenersRemovalDetection();
     this._setupHitTargetInterceptors();
 
-    if (isUnderTest)
-      (this.window as any).__injectedScript = this;
+    (this.window as any).__injectedScript = this;
   }
 
   builtinSetTimeout(callback: Function, timeout: number) {
@@ -245,6 +244,48 @@ export class InjectedScript {
     } finally {
       this._evaluator.end();
     }
+  }
+
+  structuredContent(): { markup: string } {
+    const leafRoles = new Set(['button', 'link', 'checkbox', 'textbox', 'combobox']);
+    const normalizeWhitespace = (text: string) => text.replace(/[\s\n]+/g, match => match.includes('\n') ? '\n' : ' ');
+    const tokens: string[] = [];
+    let lastId = 0;
+    const visit = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        tokens.push(node.nodeValue!);
+        return;
+      }
+
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as Element;
+        if (element.nodeName === 'SCRIPT' || element.nodeName === 'STYLE' || element.nodeName === 'NOSCRIPT')
+          return;
+        if (this.isVisible(element)) {
+          const role = this.getAriaRole(element) as string;
+          if (role && leafRoles.has(role)) {
+            const name = this.getElementAccessibleName(element);
+            const structuralId = String(++lastId);
+            (element as any).__pw_structured_id = structuralId;
+            const tag = renderTag(role, name, structuralId);
+            (element as any).__pw_structured_tag = tag;
+            tokens.push(tag);
+            return;
+          }
+        }
+        for (const child of element.childNodes)
+          visit(child);
+      }
+    };
+    beginAriaCaches();
+    try {
+      visit(this.document.body);
+    } finally {
+      endAriaCaches();
+    }
+    return {
+      markup: normalizeWhitespace(tokens.join(' ')),
+    };
   }
 
   private _queryEngineAll(part: ParsedSelectorPart, root: SelectorRoot): Element[] {

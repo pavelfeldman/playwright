@@ -35,6 +35,7 @@ export type ActionName =
 export type ActionBase = {
   name: ActionName,
   signals: Signal[],
+  command?: string;
 };
 
 export type ClickAction = ActionBase & {
@@ -159,3 +160,9 @@ type FrameDescriptionChildFrame = {
 };
 
 export type FrameDescription = { pageAlias: string } & (FrameDescriptionMainFrame | FrameDescriptionChildFrame);
+
+export type ElementInfo = {
+  markup: string;
+  tag: string;
+  id: string;
+};

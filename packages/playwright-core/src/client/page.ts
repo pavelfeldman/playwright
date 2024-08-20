@@ -354,6 +354,10 @@ export class Page extends ChannelOwner<channels.PageChannel> implements api.Page
     return await this._mainFrame.setContent(html, options);
   }
 
+  async _structuredContent(): Promise<{ markup: string }> {
+    return await this._mainFrame._structuredContent();
+  }
+
   async goto(url: string, options?: channels.FrameGotoOptions): Promise<Response | null> {
     return await this._mainFrame.goto(url, options);
   }

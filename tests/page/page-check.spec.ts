@@ -145,3 +145,12 @@ it('should check the box using setChecked', async ({ page }) => {
   await page.setChecked('input', false);
   expect(await page.evaluate(() => window['checkbox'].checked)).toBe(false);
 });
+
+it.only('aria', async ({ page }) => {
+  // await page.goto('https://github.com/microsoft/playwright/pull/30269');
+  await page.goto('https://amazon.com');
+  await page.getByRole('button').evaluateAll(() => {});
+  console.log('LOADED');
+  const { markup } = await page._structuredContent();
+  console.log(markup);
+});

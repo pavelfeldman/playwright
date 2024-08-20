@@ -2468,6 +2468,7 @@ export interface FrameChannel extends FrameEventTarget, Channel {
   check(params: FrameCheckParams, metadata?: CallMetadata): Promise<FrameCheckResult>;
   click(params: FrameClickParams, metadata?: CallMetadata): Promise<FrameClickResult>;
   content(params?: FrameContentParams, metadata?: CallMetadata): Promise<FrameContentResult>;
+  structuredContent(params?: FrameStructuredContentParams, metadata?: CallMetadata): Promise<FrameStructuredContentResult>;
   dragAndDrop(params: FrameDragAndDropParams, metadata?: CallMetadata): Promise<FrameDragAndDropResult>;
   dblclick(params: FrameDblclickParams, metadata?: CallMetadata): Promise<FrameDblclickResult>;
   dispatchEvent(params: FrameDispatchEventParams, metadata?: CallMetadata): Promise<FrameDispatchEventResult>;
@@ -2624,6 +2625,11 @@ export type FrameContentParams = {};
 export type FrameContentOptions = {};
 export type FrameContentResult = {
   value: string,
+};
+export type FrameStructuredContentParams = {};
+export type FrameStructuredContentOptions = {};
+export type FrameStructuredContentResult = {
+  markup: string,
 };
 export type FrameDragAndDropParams = {
   source: string,

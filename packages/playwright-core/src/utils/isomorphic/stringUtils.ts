@@ -140,3 +140,13 @@ export function escapeHTMLAttribute(s: string): string {
 export function escapeHTML(s: string): string {
   return s.replace(/[&<]/ug, char => (escaped as any)[char]);
 }
+
+export function renderTag(role: string, name: string, id: string): string {
+  const escapedName = escapeHTML(name);
+  switch (role) {
+    case 'button': return `<button id="${id}">${escapedName}</button>`;
+    case 'link': return `<a id="${id}">${escapedName}</a>`;
+    case 'textbox': return `<input id="${id}" title="${escapedName}"></input>`;
+  }
+  return `<div role=${role} id="${id}">${escapedName}</div>`;
+}
