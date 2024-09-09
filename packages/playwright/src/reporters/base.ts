@@ -32,7 +32,6 @@ type Annotation = {
 type ErrorDetails = {
   message: string;
   location?: Location;
-  matcherResult?: TestError['matcherResult'];
 };
 
 type TestSummary = {
