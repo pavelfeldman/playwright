@@ -40,7 +40,7 @@ function findClosest<T>(items: T[], metric: (v: T) => number, target: number) {
   });
 }
 
-export const SnapshotTab: React.FunctionComponent<{
+export const SnapshotTabsView: React.FunctionComponent<{
   action: ActionTraceEvent | undefined,
   model?: MultiTraceModel,
   sdkLanguage: Language,
@@ -50,74 +50,26 @@ export const SnapshotTab: React.FunctionComponent<{
   highlightedLocator: string,
   setHighlightedLocator: (locator: string) => void,
   openPage?: (url: string, target?: string) => Window | any,
-}> = ({ action, model, sdkLanguage, testIdAttributeName, isInspecting, setIsInspecting, highlightedLocator, setHighlightedLocator, openPage }) => {
-  const [measure, ref] = useMeasure<HTMLDivElement>();
+}> = ({ action, sdkLanguage, testIdAttributeName, isInspecting, setIsInspecting, highlightedLocator, setHighlightedLocator, openPage }) => {
   const [snapshotTab, setSnapshotTab] = React.useState<'action'|'before'|'after'>('action');
   const [showScreenshotInsteadOfSnapshot] = useSetting('screenshot-instead-of-snapshot', false);
+  const [snapshotInfo, setSnapshotInfo] = React.useState<SnapshotInfo>({ viewport: kDefaultViewport, url: '' });
 
-  type Snapshot = { action: ActionTraceEvent, snapshotName: string, point?: { x: number, y: number }, hasInputTarget?: boolean };
-  const { snapshots } = React.useMemo(() => {
-    if (!action)
-      return { snapshots: {} };
-
-    // if the action has no beforeSnapshot, use the last available afterSnapshot.
-    let beforeSnapshot: Snapshot | undefined = action.beforeSnapshot ? { action, snapshotName: action.beforeSnapshot } : undefined;
-    let a = action;
-    while (!beforeSnapshot && a) {
-      a = prevInList(a);
-      beforeSnapshot = a?.afterSnapshot ? { action: a, snapshotName: a?.afterSnapshot } : undefined;
-    }
-    const afterSnapshot: Snapshot | undefined = action.afterSnapshot ? { action, snapshotName: action.afterSnapshot } : beforeSnapshot;
-    const actionSnapshot: Snapshot | undefined = action.inputSnapshot ? { action, snapshotName: action.inputSnapshot, hasInputTarget: true } : afterSnapshot;
-    if (actionSnapshot)
-      actionSnapshot.point = action.point;
-    return { snapshots: { action: actionSnapshot, before: beforeSnapshot, after: afterSnapshot } };
+  const snapshots = React.useMemo(() => {
+    return collectSnapshots(action);
   }, [action]);
 
-  const { snapshotInfoUrl, snapshotUrl, popoutUrl, point } = React.useMemo(() => {
+  const snapshotUrls = React.useMemo(() => {
     const snapshot = snapshots[snapshotTab];
-    if (!snapshot)
-      return { snapshotUrl: kBlankSnapshotUrl };
-
-    const params = new URLSearchParams();
-    params.set('trace', context(snapshot.action).traceUrl);
-    params.set('name', snapshot.snapshotName);
-    if (snapshot.point) {
-      params.set('pointX', String(snapshot.point.x));
-      params.set('pointY', String(snapshot.point.y));
-      if (snapshot.hasInputTarget)
-        params.set('hasInputTarget', '1');
-    }
-    const snapshotUrl = new URL(`snapshot/${snapshot.action.pageId}?${params.toString()}`, window.location.href).toString();
-    const snapshotInfoUrl = new URL(`snapshotInfo/${snapshot.action.pageId}?${params.toString()}`, window.location.href).toString();
-
-    const popoutParams = new URLSearchParams();
-    popoutParams.set('r', snapshotUrl);
-    popoutParams.set('trace', context(snapshot.action).traceUrl);
-    if (snapshot.point) {
-      popoutParams.set('pointX', String(snapshot.point.x));
-      popoutParams.set('pointY', String(snapshot.point.y));
-      if (snapshot.hasInputTarget)
-        params.set('hasInputTarget', '1');
-    }
-    const popoutUrl = new URL(`snapshot.html?${popoutParams.toString()}`, window.location.href).toString();
-    return { snapshots, snapshotInfoUrl, snapshotUrl, popoutUrl, point: snapshot.point };
+    return snapshot ? extendSnapshot(snapshot) : undefined;
   }, [snapshots, snapshotTab]);
 
-  const iframeRef0 = React.useRef<HTMLIFrameElement>(null);
-  const iframeRef1 = React.useRef<HTMLIFrameElement>(null);
-  const [snapshotInfo, setSnapshotInfo] = React.useState<{ viewport: typeof kDefaultViewport, url: string, timestamp?: number, wallTime?: undefined }>({ viewport: kDefaultViewport, url: '' });
-  const loadingRef = React.useRef({ iteration: 0, visibleIframe: 0 });
 
   React.useEffect(() => {
     (async () => {
-      const thisIteration = loadingRef.current.iteration + 1;
-      const newVisibleIframe = 1 - loadingRef.current.visibleIframe;
-      loadingRef.current.iteration = thisIteration;
-
       const newSnapshotInfo = { url: '', viewport: kDefaultViewport, timestamp: undefined, wallTime: undefined };
-      if (snapshotInfoUrl) {
-        const response = await fetch(snapshotInfoUrl);
+      if (snapshotUrls?.snapshotInfoUrl) {
+        const response = await fetch(snapshotUrls?.snapshotInfoUrl);
         const info = await response.json();
         if (!info.error) {
           newSnapshotInfo.url = info.url;
@@ -126,6 +78,69 @@ export const SnapshotTab: React.FunctionComponent<{
           newSnapshotInfo.wallTime = info.wallTime;
         }
       }
+      setSnapshotInfo(newSnapshotInfo);
+    })();
+  });
+
+  return <div className='vbox'>
+    <Toolbar>
+      <ToolbarButton className='pick-locator' title={showScreenshotInsteadOfSnapshot ? 'Disable "screenshots instead of snapshots" to pick a locator' : 'Pick locator'} icon='target' toggled={isInspecting} onClick={() => setIsInspecting(!isInspecting)} disabled={showScreenshotInsteadOfSnapshot} />
+      {['action', 'before', 'after'].map(tab => {
+        return <TabbedPaneTab
+          key={tab}
+          id={tab}
+          title={renderTitle(tab)}
+          selected={snapshotTab === tab}
+          onSelect={() => setSnapshotTab(tab as 'action' | 'before' | 'after')}
+        ></TabbedPaneTab>;
+      })}
+      <div style={{ flex: 'auto' }}></div>
+      <ToolbarButton icon='link-external' title={showScreenshotInsteadOfSnapshot ? 'Not available when showing screenshot' : 'Open snapshot in a new tab'} disabled={!snapshotUrls?.popoutUrl || showScreenshotInsteadOfSnapshot} onClick={() => {
+        if (!openPage)
+          openPage = window.open;
+        const win = openPage(snapshotUrls?.popoutUrl || '', '_blank');
+        win?.addEventListener('DOMContentLoaded', () => {
+          const injectedScript = new InjectedScript(win as any, false, sdkLanguage, testIdAttributeName, 1, 'chromium', []);
+          new ConsoleAPI(injectedScript);
+        });
+      }} />
+    </Toolbar>
+    {!showScreenshotInsteadOfSnapshot && <SnapshotView
+      snapshotUrls={snapshotUrls}
+      snapshotInfo={snapshotInfo}
+      sdkLanguage={sdkLanguage}
+      testIdAttributeName={testIdAttributeName}
+      isInspecting={isInspecting}
+      setIsInspecting={setIsInspecting}
+      highlightedLocator={highlightedLocator}
+      setHighlightedLocator={setHighlightedLocator}
+    />}
+    {showScreenshotInsteadOfSnapshot && <ScreenshotView
+      action={action}
+      snapshot={snapshots[snapshotTab]}
+      snapshotInfo={snapshotInfo} />}
+  </div>;
+};
+
+export const SnapshotView: React.FunctionComponent<{
+  snapshotUrls: SnapshotUrls | undefined,
+  snapshotInfo: SnapshotInfo,
+  sdkLanguage: Language,
+  testIdAttributeName: string,
+  isInspecting: boolean,
+  setIsInspecting: (isInspecting: boolean) => void,
+  highlightedLocator: string,
+  setHighlightedLocator: (locator: string) => void,
+}> = ({ snapshotUrls, snapshotInfo, sdkLanguage, testIdAttributeName, isInspecting, setIsInspecting, highlightedLocator, setHighlightedLocator }) => {
+  const iframeRef0 = React.useRef<HTMLIFrameElement>(null);
+  const iframeRef1 = React.useRef<HTMLIFrameElement>(null);
+  const loadingRef = React.useRef({ iteration: 0, visibleIframe: 0 });
+
+  React.useEffect(() => {
+    (async () => {
+      const thisIteration = loadingRef.current.iteration + 1;
+      const newVisibleIframe = 1 - loadingRef.current.visibleIframe;
+      loadingRef.current.iteration = thisIteration;
 
       // Interrupted by another load - bail out.
       if (loadingRef.current.iteration !== thisIteration)
@@ -140,6 +155,7 @@ export const SnapshotTab: React.FunctionComponent<{
           iframe.addEventListener('error', loadedCallback);
 
           // Try preventing history entry from being created.
+          const snapshotUrl = snapshotUrls?.snapshotUrl || kBlankSnapshotUrl;
           if (iframe.contentWindow)
             iframe.contentWindow.location.replace(snapshotUrl);
           else
@@ -157,32 +173,8 @@ export const SnapshotTab: React.FunctionComponent<{
         return;
 
       loadingRef.current.visibleIframe = newVisibleIframe;
-      setSnapshotInfo(newSnapshotInfo);
     })();
-  }, [snapshotUrl, snapshotInfoUrl]);
-
-  const windowHeaderHeight = 40;
-  const snapshotContainerSize = {
-    width: snapshotInfo.viewport.width,
-    height: snapshotInfo.viewport.height + windowHeaderHeight,
-  };
-  const scale = Math.min(measure.width / snapshotContainerSize.width, measure.height / snapshotContainerSize.height, 1);
-  const translate = {
-    x: (measure.width - snapshotContainerSize.width) / 2,
-    y: (measure.height - snapshotContainerSize.height) / 2,
-  };
-
-  const page = action ? pageForAction(action) : undefined;
-  const screencastFrame = React.useMemo(
-      () => {
-        if (snapshotInfo.wallTime && page?.screencastFrames[0]?.frameSwapWallTime)
-          return findClosest(page.screencastFrames, frame => frame.frameSwapWallTime!, snapshotInfo.wallTime);
-
-        if (snapshotInfo.timestamp && page?.screencastFrames)
-          return findClosest(page.screencastFrames, frame => frame.timestamp, snapshotInfo.timestamp);
-      },
-      [page?.screencastFrames, snapshotInfo.timestamp, snapshotInfo.wallTime]
-  );
+  }, [snapshotUrls]);
 
   return <div
     className='snapshot-tab'
@@ -210,28 +202,61 @@ export const SnapshotTab: React.FunctionComponent<{
       setHighlightedLocator={setHighlightedLocator}
       iframe={iframeRef1.current}
       iteration={loadingRef.current.iteration} />
-    <Toolbar>
-      <ToolbarButton className='pick-locator' title={showScreenshotInsteadOfSnapshot ? 'Disable "screenshots instead of snapshots" to pick a locator' : 'Pick locator'} icon='target' toggled={isInspecting} onClick={() => setIsInspecting(!isInspecting)} disabled={showScreenshotInsteadOfSnapshot} />
-      {['action', 'before', 'after'].map(tab => {
-        return <TabbedPaneTab
-          key={tab}
-          id={tab}
-          title={renderTitle(tab)}
-          selected={snapshotTab === tab}
-          onSelect={() => setSnapshotTab(tab as 'action' | 'before' | 'after')}
-        ></TabbedPaneTab>;
-      })}
-      <div style={{ flex: 'auto' }}></div>
-      <ToolbarButton icon='link-external' title={showScreenshotInsteadOfSnapshot ? 'Not available when showing screenshot' : 'Open snapshot in a new tab'} disabled={!popoutUrl || showScreenshotInsteadOfSnapshot} onClick={() => {
-        if (!openPage)
-          openPage = window.open;
-        const win = openPage(popoutUrl || '', '_blank');
-        win?.addEventListener('DOMContentLoaded', () => {
-          const injectedScript = new InjectedScript(win as any, false, sdkLanguage, testIdAttributeName, 1, 'chromium', []);
-          new ConsoleAPI(injectedScript);
-        });
-      }}></ToolbarButton>
-    </Toolbar>
+    <SnapshotWrapper snapshotInfo={snapshotInfo}>
+      <div className='snapshot-switcher'>
+        <iframe ref={iframeRef0} name='snapshot' title='DOM Snapshot' className={clsx(loadingRef.current.visibleIframe === 0 && 'snapshot-visible')}></iframe>
+        <iframe ref={iframeRef1} name='snapshot' title='DOM Snapshot' className={clsx(loadingRef.current.visibleIframe === 1 && 'snapshot-visible')}></iframe>
+      </div>
+    </SnapshotWrapper>
+  </div>;
+};
+
+export const ScreenshotView: React.FunctionComponent<{
+  action: ActionTraceEvent | undefined,
+  snapshot: Snapshot | undefined,
+  snapshotInfo: SnapshotInfo,
+}> = ({ action, snapshot, snapshotInfo }) => {
+
+  const page = action ? pageForAction(action) : undefined;
+  const screencastFrame = React.useMemo(() => {
+    if (snapshotInfo.wallTime && page?.screencastFrames[0]?.frameSwapWallTime)
+      return findClosest(page.screencastFrames, frame => frame.frameSwapWallTime!, snapshotInfo.wallTime);
+
+    if (snapshotInfo.timestamp && page?.screencastFrames)
+      return findClosest(page.screencastFrames, frame => frame.timestamp, snapshotInfo.timestamp);
+  },
+  [page?.screencastFrames, snapshotInfo.timestamp, snapshotInfo.wallTime]);
+
+  const point = snapshot?.point;
+
+  return <SnapshotWrapper snapshotInfo={snapshotInfo}>
+    {screencastFrame && (
+      <>
+        {point && <ClickPointer point={point} />}
+        <img alt={`Screenshot of ${action?.apiName}`} src={`sha1/${screencastFrame.sha1}`} width={screencastFrame.width} height={screencastFrame.height} />
+      </>
+    )}
+  </SnapshotWrapper>;
+};
+
+const SnapshotWrapper: React.FunctionComponent<React.PropsWithChildren<{
+  snapshotInfo: SnapshotInfo,
+}>> = ({ snapshotInfo, children }) => {
+  const [measure, ref] = useMeasure<HTMLDivElement>();
+
+  const windowHeaderHeight = 40;
+  const snapshotContainerSize = {
+    width: snapshotInfo.viewport.width,
+    height: snapshotInfo.viewport.height + windowHeaderHeight,
+  };
+
+  const scale = Math.min(measure.width / snapshotContainerSize.width, measure.height / snapshotContainerSize.height, 1);
+  const translate = {
+    x: (measure.width - snapshotContainerSize.width) / 2,
+    y: (measure.height - snapshotContainerSize.height) / 2,
+  };
+
+  return <div className='snapshot-tab'>
     <div ref={ref} className='snapshot-wrapper'>
       <div className='snapshot-container' style={{
         width: snapshotContainerSize.width + 'px',
@@ -239,16 +264,7 @@ export const SnapshotTab: React.FunctionComponent<{
         transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
       }}>
         <BrowserFrame url={snapshotInfo.url} />
-        {(showScreenshotInsteadOfSnapshot && screencastFrame) && (
-          <>
-            {point && <ClickPointer point={point} />}
-            <img alt={`Screenshot of ${action?.apiName} > ${renderTitle(snapshotTab)}`} src={`sha1/${screencastFrame.sha1}`} width={screencastFrame.width} height={screencastFrame.height} />
-          </>
-        )}
-        <div className='snapshot-switcher' style={showScreenshotInsteadOfSnapshot ? { display: 'none' } : undefined}>
-          <iframe ref={iframeRef0} name='snapshot' title='DOM Snapshot' className={clsx(loadingRef.current.visibleIframe === 0 && 'snapshot-visible')}></iframe>
-          <iframe ref={iframeRef1} name='snapshot' title='DOM Snapshot' className={clsx(loadingRef.current.visibleIframe === 1 && 'snapshot-visible')}></iframe>
-        </div>
+        {children}
       </div>
     </div>
   </div>;
@@ -323,6 +339,76 @@ function createRecorders(recorders: { recorder: Recorder, frameSelector: string 
     const frameSelector = childFrame.frameElement ? win._injectedScript.generateSelectorSimple(childFrame.frameElement, { omitInternalEngines: true, testIdAttributeName }) + ' >> internal:control=enter-frame >> ' : '';
     createRecorders(recorders, sdkLanguage, testIdAttributeName, isUnderTest, parentFrameSelector + frameSelector, childFrame);
   }
+}
+
+type Snapshot = {
+  action: ActionTraceEvent;
+  snapshotName: string;
+  point?: { x: number, y: number };
+  hasInputTarget?: boolean;
+};
+
+type SnapshotInfo = {
+  url: string;
+  viewport: { width: number, height: number };
+  timestamp?: number;
+  wallTime?: undefined;
+};
+
+type Snapshots = {
+  action?: Snapshot;
+  before?: Snapshot;
+  after?: Snapshot;
+};
+
+type SnapshotUrls = {
+  snapshotInfoUrl: string;
+  snapshotUrl: string;
+  popoutUrl: string;
+};
+
+export function collectSnapshots(action: ActionTraceEvent | undefined): Snapshots {
+  if (!action)
+    return {};
+
+  // if the action has no beforeSnapshot, use the last available afterSnapshot.
+  let beforeSnapshot: Snapshot | undefined = action.beforeSnapshot ? { action, snapshotName: action.beforeSnapshot } : undefined;
+  let a = action;
+  while (!beforeSnapshot && a) {
+    a = prevInList(a);
+    beforeSnapshot = a?.afterSnapshot ? { action: a, snapshotName: a?.afterSnapshot } : undefined;
+  }
+  const afterSnapshot: Snapshot | undefined = action.afterSnapshot ? { action, snapshotName: action.afterSnapshot } : beforeSnapshot;
+  const actionSnapshot: Snapshot | undefined = action.inputSnapshot ? { action, snapshotName: action.inputSnapshot, hasInputTarget: true } : afterSnapshot;
+  if (actionSnapshot)
+    actionSnapshot.point = action.point;
+  return { action: actionSnapshot, before: beforeSnapshot, after: afterSnapshot };
+}
+
+export function extendSnapshot(snapshot: Snapshot): SnapshotUrls {
+  const params = new URLSearchParams();
+  params.set('trace', context(snapshot.action).traceUrl);
+  params.set('name', snapshot.snapshotName);
+  if (snapshot.point) {
+    params.set('pointX', String(snapshot.point.x));
+    params.set('pointY', String(snapshot.point.y));
+    if (snapshot.hasInputTarget)
+      params.set('hasInputTarget', '1');
+  }
+  const snapshotUrl = new URL(`snapshot/${snapshot.action.pageId}?${params.toString()}`, window.location.href).toString();
+  const snapshotInfoUrl = new URL(`snapshotInfo/${snapshot.action.pageId}?${params.toString()}`, window.location.href).toString();
+
+  const popoutParams = new URLSearchParams();
+  popoutParams.set('r', snapshotUrl);
+  popoutParams.set('trace', context(snapshot.action).traceUrl);
+  if (snapshot.point) {
+    popoutParams.set('pointX', String(snapshot.point.x));
+    popoutParams.set('pointY', String(snapshot.point.y));
+    if (snapshot.hasInputTarget)
+      params.set('hasInputTarget', '1');
+  }
+  const popoutUrl = new URL(`snapshot.html?${popoutParams.toString()}`, window.location.href).toString();
+  return { snapshotInfoUrl, snapshotUrl, popoutUrl };
 }
 
 const kDefaultViewport = { width: 1280, height: 720 };
