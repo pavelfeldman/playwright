@@ -58,29 +58,13 @@ export const SnapshotTabsView: React.FunctionComponent<{
   const snapshots = React.useMemo(() => {
     return collectSnapshots(action);
   }, [action]);
-
   const snapshotUrls = React.useMemo(() => {
     const snapshot = snapshots[snapshotTab];
     return snapshot ? extendSnapshot(snapshot) : undefined;
   }, [snapshots, snapshotTab]);
-
-
   React.useEffect(() => {
-    (async () => {
-      const newSnapshotInfo = { url: '', viewport: kDefaultViewport, timestamp: undefined, wallTime: undefined };
-      if (snapshotUrls?.snapshotInfoUrl) {
-        const response = await fetch(snapshotUrls?.snapshotInfoUrl);
-        const info = await response.json();
-        if (!info.error) {
-          newSnapshotInfo.url = info.url;
-          newSnapshotInfo.viewport = info.viewport;
-          newSnapshotInfo.timestamp = info.timestamp;
-          newSnapshotInfo.wallTime = info.wallTime;
-        }
-      }
-      setSnapshotInfo(newSnapshotInfo);
-    })();
-  });
+    fetchSnapshotInfo(snapshotUrls?.snapshotInfoUrl).then(setSnapshotInfo);
+  }, [snapshotUrls?.snapshotInfoUrl]);
 
   return <div className='vbox'>
     <Toolbar>
@@ -341,27 +325,27 @@ function createRecorders(recorders: { recorder: Recorder, frameSelector: string 
   }
 }
 
-type Snapshot = {
+export type Snapshot = {
   action: ActionTraceEvent;
   snapshotName: string;
   point?: { x: number, y: number };
   hasInputTarget?: boolean;
 };
 
-type SnapshotInfo = {
+export type SnapshotInfo = {
   url: string;
   viewport: { width: number, height: number };
   timestamp?: number;
   wallTime?: undefined;
 };
 
-type Snapshots = {
+export type Snapshots = {
   action?: Snapshot;
   before?: Snapshot;
   after?: Snapshot;
 };
 
-type SnapshotUrls = {
+export type SnapshotUrls = {
   snapshotInfoUrl: string;
   snapshotUrl: string;
   popoutUrl: string;
@@ -411,5 +395,20 @@ export function extendSnapshot(snapshot: Snapshot): SnapshotUrls {
   return { snapshotInfoUrl, snapshotUrl, popoutUrl };
 }
 
-const kDefaultViewport = { width: 1280, height: 720 };
+export async function fetchSnapshotInfo(snapshotInfoUrl: string | undefined) {
+  const result = { url: '', viewport: kDefaultViewport, timestamp: undefined, wallTime: undefined };
+  if (snapshotInfoUrl) {
+    const response = await fetch(snapshotInfoUrl);
+    const info = await response.json();
+    if (!info.error) {
+      result.url = info.url;
+      result.viewport = info.viewport;
+      result.timestamp = info.timestamp;
+      result.wallTime = info.wallTime;
+    }
+  }
+  return result;
+}
+
+export const kDefaultViewport = { width: 1280, height: 720 };
 const kBlankSnapshotUrl = 'data:text/html,<body style="background: #ddd"></body>';
