@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import type { Frame, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { test as it, expect } from './pageTest';
 
 it('should check the box @smoke', async ({ page }) => {
@@ -150,37 +150,34 @@ it('should check the box using setChecked', async ({ page }) => {
 class PageDriver {
   private _page: Page;
   private _requests = new Set();
-  private _timers = new Map();
-  private _pendingMainFrameNavigation = false;
+  private _timers = new Set();
+  private _navigatingMainFrame = false;
   private _callback: [() => void, (error: Error) => void];
+  private _startTime: number;
 
   constructor(page: Page) {
     this._page = page;
   }
 
-  async run(action: () => Promise<void>) {
+  async run(action: () => Promise<void>, title: string) {
+    console.log(title);
     this._timers.clear();
     this._requests.clear();
-    this._pendingMainFrameNavigation = false;
+    this._navigatingMainFrame = false;
+    this._startTime = Date.now();
     this._callback?.[1](new Error('Action terminated'));
+    const promise = new Promise<void>((f, r) => this._callback = [f, r]);
     await action();
-    return new Promise<void>((f, r) => this._callback = [f, r]);
+    setTimeout(() => { this._check(); }, 1000);
+    await promise;
   }
 
   async install() {
-    const removeFrameTimers = (frame: Frame) => {
-      for (const [id, f] of this._timers) {
-        if (f === frame)
-          this._timers.delete(id);
-      }
-      for (const child of frame.childFrames())
-        removeFrameTimers(child);
-      this._check();
-    };
-
     await this._page.exposeBinding('_clockEvent', (source, event) => {
+      if (source.frame.parentFrame())
+        return;
       if (event.event === 'install')
-        this._timers.set(event.params.id, source.frame);
+        this._timers.add(event.params.id);
       if (event.event === 'uninstall')
         this._timers.delete(event.params.id);
       if (event.event === 'fire')
@@ -189,29 +186,34 @@ class PageDriver {
     });
 
     this._page.on('framenavigated', frame => {
-      removeFrameTimers(frame);
-      if (!frame.parentFrame()) {
-        this._pendingMainFrameNavigation = true;
-        void frame.waitForLoadState('load').then(() => this._done());
-      }
+      if (!frame.parentFrame())
+        return;
+      this._navigatingMainFrame = true;
     });
-    this._page.on('framedetached', frame => removeFrameTimers(frame));
+
+    this._page.on('load', () => {
+      this._navigatingMainFrame = false;
+      this._done();
+    });
 
     this._page.on('request', request => {
+      if (!request.frame() || request.frame().parentFrame())
+        return;
       this._requests.add(request);
+    });
+
+    this._page.on('response', response => {
+      const request = response.request();
+      this._requests.delete(request);
       this._check();
-      void request.response().finally(() => {
-        this._requests.delete(request);
-        this._check();
-      });
     });
 
     await this._page.clock.install();
   }
 
   private _check() {
-    console.log('requests: ' + this._requests.size, 'timers: ' + this._timers.size);
-    if (!this._requests.size && !this._timers.size && !this._pendingMainFrameNavigation)
+    // console.log('requests: ' + this._requests.size, 'timers: ' + this._timers.size);
+    if (!this._requests.size && !this._timers.size && !this._navigatingMainFrame && Date.now() - this._startTime > 1000)
       this._done();
   }
 
@@ -223,10 +225,24 @@ class PageDriver {
 it.only('aaa', async ({ page }) => {
   const driver = new PageDriver(page);
   await driver.install();
+
   await driver.run(async () => {
     await page.goto('https://github.com/orgs/microsoft');
-  });
-  console.log('navigated');
-  await page.getByRole('button', { name: 'Repositories' }).click();
-  console.log('repos');
+  }, 'navigate');
+
+  await driver.run(async () => {
+    await page.getByRole('link', { name: 'Repositories 6.5k' }).evaluate(element => element.click());
+  }, 'repos');
+
+  await driver.run(async () => {
+    await page.getByTestId('filter-input').evaluate(e => e.textContent);
+    await page.getByTestId('filter-input').fill('playwright');
+    await page.getByTestId('filter-input').press('Enter');
+  }, 'search');
+
+  await driver.run(async () => {
+    await page.getByLabel('playwright.', { exact: true }).getByTestId('listitem-title-link').evaluate(e => e.click());
+  }, 'click playwright');
+
+  // await new Promise(() => {});
 });
