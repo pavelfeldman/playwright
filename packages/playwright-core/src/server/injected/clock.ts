@@ -264,9 +264,15 @@ export class ClockController {
       error: new Error(),
     };
     this._timers.set(timer.id, timer);
+    this._emitEvent('install', { id: timer.id, delay: timer.delay, count: this._timers.size });
     if (this._realTime)
       this._updateRealTimeTimer();
     return timer.id;
+  }
+
+  private _emitEvent(event: string, params: any) {
+    // eslint-disable-next-line no-restricted-globals
+    (globalThis as any)._clockEvent({ event, params });
   }
 
   countTimers() {
@@ -291,10 +297,13 @@ export class ClockController {
 
     this._advanceNow(timer.callAt);
 
-    if (timer.type === TimerType.Interval)
+    if (timer.type === TimerType.Interval) {
       timer.callAt = shiftTicks(timer.callAt, timer.delay);
-    else
+      this._emitEvent('move', { id: timer.id, delay: timer.delay, count: this._timers.size });
+    } else {
       this._timers.delete(timer.id);
+      this._emitEvent('fire', { id: timer.id, delay: timer.delay, count: this._timers.size });
+    }
     return timer;
   }
 
@@ -369,6 +378,7 @@ export class ClockController {
         (timer.type === 'Interval' && type === 'Timeout')
       ) {
         this._timers.delete(id);
+        this._emitEvent('uninstall', { id: timer.id, count: this._timers.size });
       } else {
         const clear = getClearHandler(type);
         const schedule = getScheduleHandler(timer.type);

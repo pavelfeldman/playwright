@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+import type { Frame, Page } from '@playwright/test';
 import { test as it, expect } from './pageTest';
 
 it('should check the box @smoke', async ({ page }) => {
@@ -144,4 +145,88 @@ it('should check the box using setChecked', async ({ page }) => {
   expect(await page.evaluate(() => window['checkbox'].checked)).toBe(true);
   await page.setChecked('input', false);
   expect(await page.evaluate(() => window['checkbox'].checked)).toBe(false);
+});
+
+class PageDriver {
+  private _page: Page;
+  private _requests = new Set();
+  private _timers = new Map();
+  private _pendingMainFrameNavigation = false;
+  private _callback: [() => void, (error: Error) => void];
+
+  constructor(page: Page) {
+    this._page = page;
+  }
+
+  async run(action: () => Promise<void>) {
+    this._timers.clear();
+    this._requests.clear();
+    this._pendingMainFrameNavigation = false;
+    this._callback?.[1](new Error('Action terminated'));
+    await action();
+    return new Promise<void>((f, r) => this._callback = [f, r]);
+  }
+
+  async install() {
+    const removeFrameTimers = (frame: Frame) => {
+      for (const [id, f] of this._timers) {
+        if (f === frame)
+          this._timers.delete(id);
+      }
+      for (const child of frame.childFrames())
+        removeFrameTimers(child);
+      this._check();
+    };
+
+    await this._page.exposeBinding('_clockEvent', (source, event) => {
+      if (event.event === 'install')
+        this._timers.set(event.params.id, source.frame);
+      if (event.event === 'uninstall')
+        this._timers.delete(event.params.id);
+      if (event.event === 'fire')
+        this._timers.delete(event.params.id);
+      this._check();
+    });
+
+    this._page.on('framenavigated', frame => {
+      removeFrameTimers(frame);
+      if (!frame.parentFrame()) {
+        this._pendingMainFrameNavigation = true;
+        void frame.waitForLoadState('load').then(() => this._done());
+      }
+    });
+    this._page.on('framedetached', frame => removeFrameTimers(frame));
+
+    this._page.on('request', request => {
+      this._requests.add(request);
+      this._check();
+      void request.response().finally(() => {
+        this._requests.delete(request);
+        this._check();
+      });
+    });
+
+    await this._page.clock.install();
+  }
+
+  private _check() {
+    console.log('requests: ' + this._requests.size, 'timers: ' + this._timers.size);
+    if (!this._requests.size && !this._timers.size && !this._pendingMainFrameNavigation)
+      this._done();
+  }
+
+  private _done() {
+    this._callback?.[0]();
+  }
+}
+
+it.only('aaa', async ({ page }) => {
+  const driver = new PageDriver(page);
+  await driver.install();
+  await driver.run(async () => {
+    await page.goto('https://github.com/orgs/microsoft');
+  });
+  console.log('navigated');
+  await page.getByRole('button', { name: 'Repositories' }).click();
+  console.log('repos');
 });
