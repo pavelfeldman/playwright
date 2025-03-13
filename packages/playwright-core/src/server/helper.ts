@@ -22,6 +22,7 @@ import type { Progress } from './progress';
 import type * as types from './types';
 import type { RegisteredListener } from './utils/eventsHelper';
 import type { EventEmitter } from 'events';
+import { url } from 'inspector';
 
 
 const MAX_LOG_LENGTH = process.env.MAX_LOG_LENGTH ? +process.env.MAX_LOG_LENGTH : Infinity;
@@ -94,7 +95,70 @@ class Helper {
           text = text.substring(0, MAX_LOG_LENGTH / 2) + ' <<<<<( LOG TRUNCATED )>>>>> ' + text.substring(text.length - MAX_LOG_LENGTH / 2);
         debugLogger.log('protocol', (direction === 'send' ? 'SEND ► ' : '◀ RECV ') + text);
       }
-    };
+      return;
+
+      const { method, params } = message as any;
+      if (!method?.startsWith('Network.') && !method?.startsWith('Fetch.'))
+        return;
+      if (method === 'Network.policyUpdated' || method === 'Network.enable' || method === 'Fetch.enable' || method === 'Network.setCacheDisabled')
+        return;
+
+      let printParams: any = {};
+
+      if (method === 'Network.requestWillBeSent') {
+        printParams = {
+          url: params.request.url,
+          method: params.request.method,
+          headers: params.request.headers,
+          type: params.type,
+        };
+        if (params.redirectHasExtraInfo)
+          printParams.redirectHasExtraInfo = params.redirectHasExtraInfo;
+      }
+
+      if (method === 'Network.responseReceived') {
+        printParams = {
+          url: params.response.url,
+          status: params.response.status,
+          headers: params.response.headers,
+        };
+      }
+
+      if (method === 'Network.requestWillBeSentExtraInfo') {
+        printParams = {
+          headers: params.headers,
+        };
+      }
+
+      if (method === 'Network.responseReceivedExtraInfo') {
+        printParams = {
+          headers: params.headers,
+        };
+      }
+
+      if (method === 'Network.loadingFinished') {
+        printParams = {};
+      }
+
+      if (method === 'Fetch.requestPaused') {
+        printParams = {
+          url: params.request.url,
+          headers: params.request.headers,
+        };
+      }
+
+      if (method === 'Fetch.continueRequest') {
+        printParams = {
+          headers: Object.fromEntries(params.headers.map((h: any) => [h.name, h.value]))
+        };
+      }
+
+      console.log('');
+      console.log(`### ${method}`);
+      console.log('```js');
+      console.log(JSON.stringify(printParams, null, 2));
+      console.log('```');
+    }
   }
 
   static formatBrowserLogs(logs: string[], disconnectReason?: string) {

@@ -1028,3 +1028,90 @@ it('should intercept when postData is more than 1MB', async ({ page, server }) =
   }).catch(e => {}), POST_BODY);
   expect(await interceptionPromise).toBe(POST_BODY);
 });
+
+it('direct call', async ({ page, server }) => {
+  await page.goto(server.EMPTY_PAGE);
+});
+
+it('call w/ route', async ({ page, server }) => {
+  server.setRoute('/empty.html', printRequest);
+  await page.route('**/empty.html', (route, request) => {
+    void route.continue({
+      headers: { ...request.headers(), 'custom-header-name': 'custom-header-value'}
+    })
+  });
+  await page.goto(server.EMPTY_PAGE);
+});
+
+it.only('call w/ route cookie', async ({ page, server }) => {
+  server.setRoute('/empty.html', printRequest);
+  await page.context().addCookies([{ name: 'foo2', value: 'baz', url: server.PREFIX + '/empty2.html' }]);
+  await page.route('**/empty.html', (route, request) => {
+    void route.continue({
+      headers: {
+        ...request.headers(),
+        // 'host': 'overridden-localhost:8907',
+        // 'connection': 'overridden-keep-alive',
+        // 'pragma': 'overridden-no-cache',
+        // 'cache-control': 'overridden-no-cache',
+        // 'accept': 'overridden-text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        // 'accept-language': 'overridden-en-US',
+        'cookie': 'overridden-foo=baz',
+        // 'upgrade-insecure-requests': 'overridden-1',
+        // 'user-agent': 'overridden-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/135.0.7049.3 Safari/537.36',
+        // 'sec-ch-ua': 'overridden-overridden sec-ch-ua',
+        // 'sec-ch-ua-mobile': 'overridden-?0',
+        // 'sec-ch-ua-platform': 'overridden-\'Linux\'',
+        // 'sec-fetch-site': 'overridden-none',
+        // 'sec-fetch-mode': 'overridden-navigate',
+        // 'sec-fetch-user': 'overridden-?1',
+        // 'sec-fetch-dest': 'overridden-document',
+        // 'accept-encoding': 'overridden-gzip, deflate, br, zstd'
+
+      // "pragma": "overridden-no-cache",
+      // "accept": "overridden-text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      // "cache-control": "overridden-no-cache",
+      // "accept-language": "overridden-en-US",
+      // "upgrade-insecure-requests": "overridden-1",
+      // "user-agent": "overridden-Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15",
+      // "accept-encoding": "overridden-gzip, deflate",
+      // "connection": "overridden-Keep-Alive",
+      // "host": "overridden-localhost:8907",
+      // "cookie": "overridden-foo=baz",
+      // "sec-fetch-dest": "overridden-document",
+      // "sec-fetch-mode": "overridden-navigate",
+      // "sec-fetch-site": "overridden-none"
+
+  // "host": "overrides-localhost:8907",
+  // "user-agent": "overrides-Mozilla/5.0 (X11; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0",
+  // "accept": "overrides-text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  // "accept-language": "overrides-en-US",
+  // "accept-encoding": "overrides-gzip, deflate, br, zstd",
+  // "upgrade-insecure-requests": "overrides-1",
+  // "sec-fetch-dest": "overrides-document",
+  // "sec-fetch-mode": "overrides-navigate",
+  // "sec-fetch-site": "overrides-none",
+  // "sec-fetch-user": "overrides-?1",
+  // "connection": "overrides-keep-alive",
+  // "cookie": "overrides-foo=baz",
+  // "priority": "overrides-u=0, i",
+  // "pragma": "overrides-no-cache",
+  // "cache-control": "overrides-no-cache"
+
+      }
+    })
+  });
+  await page.goto(server.EMPTY_PAGE);
+});
+
+function printRequest(request, response) {
+  const headers = {};
+  for (const header of Object.entries(request.headers))
+    headers[header[0]] = header[1];
+  console.log(``);
+  console.log(`### Server.request`);
+  console.log(`- url: ${request.url}`);
+  console.log(`- headers: ${JSON.stringify(headers, undefined, 2)}`);
+  response.writeHead(200);
+  response.end();
+}
