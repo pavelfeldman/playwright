@@ -33,6 +33,7 @@ export type { Logger } from './types';
 export { TimeoutError } from './errors';
 export { Frame } from './frame';
 export { Keyboard, Mouse, Touchscreen } from './input';
+export { IOS, IOSDevice } from './ios';
 export { JSHandle } from './jsHandle';
 export { Request, Response, Route, WebSocket, WebSocketRoute } from './network';
 export { APIRequest, APIRequestContext, APIResponse } from './fetch';

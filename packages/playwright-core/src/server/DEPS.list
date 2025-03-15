@@ -20,4 +20,5 @@
 ./chromium/
 ./electron/
 ./firefox/
+./ios/
 ./webkit/

@@ -366,6 +366,7 @@ scheme.PlaywrightInitializer = tObject({
   bidiChromium: tChannel(['BrowserType']),
   bidiFirefox: tChannel(['BrowserType']),
   android: tChannel(['Android']),
+  ios: tChannel(['IOS']),
   electron: tChannel(['Electron']),
   utils: tOptional(tChannel(['LocalUtils'])),
   selectors: tChannel(['Selectors']),
@@ -839,12 +840,14 @@ scheme.PageWaitForEventInfoParams = tType('EventTargetWaitForEventInfoParams');
 scheme.WebSocketWaitForEventInfoParams = tType('EventTargetWaitForEventInfoParams');
 scheme.ElectronApplicationWaitForEventInfoParams = tType('EventTargetWaitForEventInfoParams');
 scheme.AndroidDeviceWaitForEventInfoParams = tType('EventTargetWaitForEventInfoParams');
+scheme.IOSDeviceWaitForEventInfoParams = tType('EventTargetWaitForEventInfoParams');
 scheme.EventTargetWaitForEventInfoResult = tOptional(tObject({}));
 scheme.BrowserContextWaitForEventInfoResult = tType('EventTargetWaitForEventInfoResult');
 scheme.PageWaitForEventInfoResult = tType('EventTargetWaitForEventInfoResult');
 scheme.WebSocketWaitForEventInfoResult = tType('EventTargetWaitForEventInfoResult');
 scheme.ElectronApplicationWaitForEventInfoResult = tType('EventTargetWaitForEventInfoResult');
 scheme.AndroidDeviceWaitForEventInfoResult = tType('EventTargetWaitForEventInfoResult');
+scheme.IOSDeviceWaitForEventInfoResult = tType('EventTargetWaitForEventInfoResult');
 scheme.BrowserContextInitializer = tObject({
   isChromium: tBoolean,
   requestContext: tChannel(['APIRequestContext']),
@@ -2806,3 +2809,28 @@ scheme.JsonPipeSendParams = tObject({
 scheme.JsonPipeSendResult = tOptional(tObject({}));
 scheme.JsonPipeCloseParams = tOptional(tObject({}));
 scheme.JsonPipeCloseResult = tOptional(tObject({}));
+scheme.IOSInitializer = tOptional(tObject({}));
+scheme.IOSDevicesParams = tOptional(tObject({}));
+scheme.IOSDevicesResult = tObject({
+  devices: tArray(tChannel(['IOSDevice'])),
+});
+scheme.IOSDeviceInitializer = tObject({
+  serial: tString,
+  name: tString,
+});
+scheme.IOSDeviceScreenshotParams = tOptional(tObject({}));
+scheme.IOSDeviceScreenshotResult = tObject({
+  binary: tBinary,
+});
+scheme.IOSDeviceLaunchParams = tObject({
+  app: tString,
+});
+scheme.IOSDeviceLaunchResult = tOptional(tObject({}));
+scheme.IOSDevicePressButtonParams = tObject({
+  button: tEnum(['home', 'lock']),
+});
+scheme.IOSDevicePressButtonResult = tOptional(tObject({}));
+scheme.IOSDeviceInputTextParams = tObject({
+  text: tString,
+});
+scheme.IOSDeviceInputTextResult = tOptional(tObject({}));

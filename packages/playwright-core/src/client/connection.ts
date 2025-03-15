@@ -29,6 +29,7 @@ import { ElementHandle } from './elementHandle';
 import { TargetClosedError, parseError } from './errors';
 import { APIRequestContext } from './fetch';
 import { Frame } from './frame';
+import { IOS, IOSDevice } from './ios';
 import { JSHandle } from './jsHandle';
 import { JsonPipe } from './jsonPipe';
 import { LocalUtils } from './localUtils';
@@ -281,6 +282,12 @@ export class Connection extends EventEmitter {
         break;
       case 'Frame':
         result = new Frame(parent, type, guid, initializer);
+        break;
+      case 'IOS':
+        result = new IOS(parent, type, guid, initializer);
+        break;
+      case 'IOSDevice':
+        result = new IOSDevice(parent, type, guid, initializer);
         break;
       case 'JSHandle':
         result = new JSHandle(parent, type, guid, initializer);

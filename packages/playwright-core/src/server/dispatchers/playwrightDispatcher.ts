@@ -22,6 +22,7 @@ import { ConnectedBrowserDispatcher } from './browserDispatcher';
 import { BrowserTypeDispatcher } from './browserTypeDispatcher';
 import { Dispatcher } from './dispatcher';
 import { ElectronDispatcher } from './electronDispatcher';
+import { IOSDispatcher } from './iosDispatcher';
 import { LocalUtilsDispatcher } from './localUtilsDispatcher';
 import { APIRequestContextDispatcher } from './networkDispatchers';
 import { SelectorsDispatcher } from './selectorsDispatcher';
@@ -43,6 +44,7 @@ export class PlaywrightDispatcher extends Dispatcher<Playwright, channels.Playwr
   constructor(scope: RootDispatcher, playwright: Playwright, socksProxy?: SocksProxy, preLaunchedBrowser?: Browser, prelaunchedAndroidDevice?: AndroidDevice) {
     const browserDispatcher = preLaunchedBrowser ? new ConnectedBrowserDispatcher(scope, preLaunchedBrowser) : undefined;
     const android = new AndroidDispatcher(scope, playwright.android);
+    const ios = new IOSDispatcher(scope, playwright.ios);
     const prelaunchedAndroidDeviceDispatcher = prelaunchedAndroidDevice ? new AndroidDeviceDispatcher(android, prelaunchedAndroidDevice) : undefined;
     super(scope, playwright, 'Playwright', {
       chromium: new BrowserTypeDispatcher(scope, playwright.chromium),
@@ -51,6 +53,7 @@ export class PlaywrightDispatcher extends Dispatcher<Playwright, channels.Playwr
       bidiChromium: new BrowserTypeDispatcher(scope, playwright.bidiChromium),
       bidiFirefox: new BrowserTypeDispatcher(scope, playwright.bidiFirefox),
       android,
+      ios,
       electron: new ElectronDispatcher(scope, playwright.electron),
       utils: playwright.options.isServer ? undefined : new LocalUtilsDispatcher(scope, playwright),
       selectors: new SelectorsDispatcher(scope, browserDispatcher?.selectors || playwright.selectors),

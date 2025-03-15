@@ -19885,6 +19885,51 @@ export interface FrameLocator {
 }
 
 /**
+ * Playwright has **experimental** support for iOS automation.
+ */
+export interface IOS {
+  /**
+   * Returns the list of detected iOS devices.
+   */
+  devices(): Promise<Array<IOSDevice>>;
+}
+
+/**
+ * [IOSDevice](https://playwright.dev/docs/api/class-iosdevice) represents a launched iOS Simulator. Devices can be
+ * obtained using [iOS.devices()](https://playwright.dev/docs/api/class-ios#ios-devices).
+ */
+export interface IOSDevice {
+  /**
+   * @param text
+   */
+  inputText(text: string): Promise<void>;
+
+  /**
+   * @param app
+   */
+  launch(app: string): Promise<void>;
+
+  /**
+   * @param button
+   */
+  pressButton(button: 'home'|'lock'): Promise<void>;
+
+  /**
+   * Returns the buffer with the captured screenshot of the device.
+   * @param options
+   */
+  screenshot(options?: {
+    /**
+     * The file path to save the image to. If
+     * [`path`](https://playwright.dev/docs/api/class-iosdevice#ios-device-screenshot-option-path) is a relative path,
+     * then it is resolved relative to the current working directory. If no path is provided, the image won't be saved to
+     * the disk.
+     */
+    path?: string;
+  }): Promise<Buffer>;
+}
+
+/**
  * Keyboard provides an api for managing a virtual keyboard. The high level api is
  * [keyboard.type(text[, options])](https://playwright.dev/docs/api/class-keyboard#keyboard-type), which takes raw
  * characters and generates proper `keydown`, `keypress`/`input`, and `keyup` events on your page.
