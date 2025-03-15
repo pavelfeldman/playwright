@@ -19,6 +19,7 @@ import { Browser } from './browser';
 import { BrowserType } from './browserType';
 import { ChannelOwner } from './channelOwner';
 import { Electron } from './electron';
+import { IOS } from './ios';
 import { TimeoutError } from './errors';
 import { APIRequest } from './fetch';
 import { Selectors, SelectorsOwner } from './selectors';
@@ -28,6 +29,7 @@ import type { BrowserContextOptions, LaunchOptions } from 'playwright-core';
 
 export class Playwright extends ChannelOwner<channels.PlaywrightChannel> {
   readonly _android: Android;
+  readonly _ios: IOS;
   readonly _electron: Electron;
   readonly _bidiChromium: BrowserType;
   readonly _bidiFirefox: BrowserType;
@@ -56,6 +58,7 @@ export class Playwright extends ChannelOwner<channels.PlaywrightChannel> {
     this.webkit._playwright = this;
     this._android = Android.from(initializer.android);
     this._electron = Electron.from(initializer.electron);
+    this._ios = IOS.from(initializer.ios);
     this._bidiChromium = BrowserType.from(initializer.bidiChromium);
     this._bidiChromium._playwright = this;
     this._bidiFirefox = BrowserType.from(initializer.bidiFirefox);

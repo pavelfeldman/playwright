@@ -25,6 +25,8 @@ export interface Channel {
 
 // ----------- Initializer Traits -----------
 export type InitializerTraits<T> =
+    T extends IOSDeviceChannel ? IOSDeviceInitializer :
+    T extends IOSChannel ? IOSInitializer :
     T extends JsonPipeChannel ? JsonPipeInitializer :
     T extends AndroidDeviceChannel ? AndroidDeviceInitializer :
     T extends AndroidSocketChannel ? AndroidSocketInitializer :
@@ -63,6 +65,8 @@ export type InitializerTraits<T> =
 
 // ----------- Event Traits -----------
 export type EventsTraits<T> =
+    T extends IOSDeviceChannel ? IOSDeviceEvents :
+    T extends IOSChannel ? IOSEvents :
     T extends JsonPipeChannel ? JsonPipeEvents :
     T extends AndroidDeviceChannel ? AndroidDeviceEvents :
     T extends AndroidSocketChannel ? AndroidSocketEvents :
@@ -101,6 +105,8 @@ export type EventsTraits<T> =
 
 // ----------- EventTarget Traits -----------
 export type EventTargetTraits<T> =
+    T extends IOSDeviceChannel ? IOSDeviceEventTarget :
+    T extends IOSChannel ? IOSEventTarget :
     T extends JsonPipeChannel ? JsonPipeEventTarget :
     T extends AndroidDeviceChannel ? AndroidDeviceEventTarget :
     T extends AndroidSocketChannel ? AndroidSocketEventTarget :
@@ -618,6 +624,7 @@ export type PlaywrightInitializer = {
   bidiChromium: BrowserTypeChannel,
   bidiFirefox: BrowserTypeChannel,
   android: AndroidChannel,
+  ios: IOSChannel,
   electron: ElectronChannel,
   utils?: LocalUtilsChannel,
   selectors: SelectorsChannel,
@@ -5054,5 +5061,67 @@ export type JsonPipeCloseResult = void;
 export interface JsonPipeEvents {
   'message': JsonPipeMessageEvent;
   'closed': JsonPipeClosedEvent;
+}
+
+// ----------- IOS -----------
+export type IOSInitializer = {};
+export interface IOSEventTarget {
+}
+export interface IOSChannel extends IOSEventTarget, Channel {
+  _type_IOS: boolean;
+  devices(params?: IOSDevicesParams, metadata?: CallMetadata): Promise<IOSDevicesResult>;
+}
+export type IOSDevicesParams = {};
+export type IOSDevicesOptions = {};
+export type IOSDevicesResult = {
+  devices: IOSDeviceChannel[],
+};
+
+export interface IOSEvents {
+}
+
+// ----------- IOSDevice -----------
+export type IOSDeviceInitializer = {
+  serial: string,
+  name: string,
+};
+export interface IOSDeviceEventTarget {
+}
+export interface IOSDeviceChannel extends IOSDeviceEventTarget, EventTargetChannel {
+  _type_IOSDevice: boolean;
+  screenshot(params?: IOSDeviceScreenshotParams, metadata?: CallMetadata): Promise<IOSDeviceScreenshotResult>;
+  launch(params: IOSDeviceLaunchParams, metadata?: CallMetadata): Promise<IOSDeviceLaunchResult>;
+  pressButton(params: IOSDevicePressButtonParams, metadata?: CallMetadata): Promise<IOSDevicePressButtonResult>;
+  inputText(params: IOSDeviceInputTextParams, metadata?: CallMetadata): Promise<IOSDeviceInputTextResult>;
+}
+export type IOSDeviceScreenshotParams = {};
+export type IOSDeviceScreenshotOptions = {};
+export type IOSDeviceScreenshotResult = {
+  binary: Binary,
+};
+export type IOSDeviceLaunchParams = {
+  app: string,
+};
+export type IOSDeviceLaunchOptions = {
+
+};
+export type IOSDeviceLaunchResult = void;
+export type IOSDevicePressButtonParams = {
+  button: 'home' | 'lock',
+};
+export type IOSDevicePressButtonOptions = {
+
+};
+export type IOSDevicePressButtonResult = void;
+export type IOSDeviceInputTextParams = {
+  text: string,
+  appIds: string[],
+};
+export type IOSDeviceInputTextOptions = {
+
+};
+export type IOSDeviceInputTextResult = void;
+
+export interface IOSDeviceEvents {
 }
 

@@ -740,6 +740,7 @@ Playwright:
     bidiChromium: BrowserType
     bidiFirefox: BrowserType
     android: Android
+    ios: IOS
     electron: Electron
     utils: LocalUtils?
     selectors: Selectors
@@ -3841,3 +3842,46 @@ JsonPipe:
     closed:
       parameters:
         reason: string?
+
+IOS:
+  type: interface
+
+  commands:
+    devices:
+      returns:
+        devices:
+          type: array
+          items: IOSDevice
+
+IOSDevice:
+  type: interface
+
+  extends: EventTarget
+
+  initializer:
+    serial: string
+    name: string
+
+  commands:
+    screenshot:
+      returns:
+        binary: binary
+
+    launch:
+      parameters:
+        app: string
+
+    pressButton:
+      parameters:
+        button:
+          type: enum
+          literals:
+          - home
+          - lock
+
+    inputText:
+      parameters:
+        text: string
+        appIds:
+          type: array
+          items: string
