@@ -24,7 +24,6 @@ import * as frames from './frames';
 import { helper } from './helper';
 import * as input from './input';
 import { SdkObject } from './instrumentation';
-import { builtins } from '../utils/isomorphic/builtins';
 import { createPageBindingScript, deliverBindingResult, takeBindingHandle } from './pageBinding';
 import * as js from './javascript';
 import { ProgressController } from './progress';
@@ -38,6 +37,7 @@ import { debugLogger } from './utils/debugLogger';
 import { isInvalidSelectorError } from '../utils/isomorphic/selectorParser';
 import { ManualPromise } from '../utils/isomorphic/manualPromise';
 import { compressCallLog } from './callLog';
+import { builtins } from '../utils/isomorphic/builtins';
 
 import type { Artifact } from './artifact';
 import type * as dom from './dom';

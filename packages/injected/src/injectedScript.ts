@@ -15,7 +15,6 @@
  */
 
 import { parseAriaSnapshot } from '@isomorphic/ariaSnapshot';
-import { builtins, Set, Map, requestAnimationFrame, performance } from '@isomorphic/builtins';
 import { asLocator } from '@isomorphic/locatorGenerators';
 import { parseAttributeSelector, parseSelector, stringifySelector, visitAllSelectorParts } from '@isomorphic/selectorParser';
 import { cacheNormalizedWhitespaces, normalizeWhiteSpace, trimStringWithEllipsis } from '@isomorphic/stringUtils';
@@ -94,7 +93,22 @@ export class InjectedScript {
     isInsideScope,
     normalizeWhiteSpace,
     parseAriaSnapshot,
-    builtins: builtins(),
+    builtins: {
+      setTimeout,
+      clearTimeout,
+      setInterval,
+      clearInterval,
+      requestAnimationFrame,
+      cancelAnimationFrame,
+      requestIdleCallback,
+      cancelIdleCallback,
+      performance,
+      eval,
+      Intl,
+      Date,
+      Map,
+      Set,
+    },
   };
 
   private _autoClosingTags: Set<string>;
@@ -110,9 +124,6 @@ export class InjectedScript {
     this.window = window;
     this.document = window.document;
     this.isUnderTest = isUnderTest;
-    // Make sure builtins are created from "window". This is important for InjectedScript instantiated
-    // inside a trace viewer snapshot, where "window" differs from "globalThis".
-    this.utils.builtins = builtins(window);
     this._sdkLanguage = sdkLanguage;
     this._testIdAttributeNameForStrictErrorAndConsoleCodegen = testIdAttributeNameForStrictErrorAndConsoleCodegen;
     this._evaluator = new SelectorEvaluatorImpl();

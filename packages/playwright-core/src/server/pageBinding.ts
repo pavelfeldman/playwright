@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-import { builtins } from '../utils/isomorphic/builtins';
 import { source } from '../utils/isomorphic/utilityScriptSerializers';
 
-import type { Builtins } from '../utils/isomorphic/builtins';
 import type { SerializedValue } from '../utils/isomorphic/utilityScriptSerializers';
 
 export type BindingPayload = {
@@ -26,8 +24,8 @@ export type BindingPayload = {
   serializedArgs?: SerializedValue[],
 };
 
-function addPageBinding(playwrightBinding: string, bindingName: string, needsHandle: boolean, utilityScriptSerializersFactory: typeof source, builtins: Builtins) {
-  const { serializeAsCallArgument } = utilityScriptSerializersFactory(builtins);
+function addPageBinding(playwrightBinding: string, bindingName: string, needsHandle: boolean, utilityScriptSerializersFactory: typeof source) {
+  const { serializeAsCallArgument } = utilityScriptSerializersFactory();
   // eslint-disable-next-line no-restricted-globals
   const binding = (globalThis as any)[playwrightBinding];
   // eslint-disable-next-line no-restricted-globals
@@ -38,14 +36,14 @@ function addPageBinding(playwrightBinding: string, bindingName: string, needsHan
       throw new Error(`exposeBindingHandle supports a single argument, ${args.length} received`);
     let callbacks = me['callbacks'];
     if (!callbacks) {
-      callbacks = new builtins.Map();
+      callbacks = new (globalThis as any).__playwright_builtins__.Map();
       me['callbacks'] = callbacks;
     }
     const seq: number = (me['lastSeq'] || 0) + 1;
     me['lastSeq'] = seq;
     let handles = me['handles'];
     if (!handles) {
-      handles = new builtins.Map();
+      handles = new (globalThis as any).__playwright_builtins__.Map();
       me['handles'] = handles;
     }
     const promise = new Promise((resolve, reject) => callbacks.set(seq, { resolve, reject }));
@@ -88,5 +86,5 @@ export function deliverBindingResult(arg: { name: string, seq: number, result?: 
 }
 
 export function createPageBindingScript(playwrightBinding: string, name: string, needsHandle: boolean) {
-  return `(${addPageBinding.toString()})(${JSON.stringify(playwrightBinding)}, ${JSON.stringify(name)}, ${needsHandle}, (${source}), (${builtins})())`;
+  return `(${addPageBinding.toString()})(${JSON.stringify(playwrightBinding)}, ${JSON.stringify(name)}, ${needsHandle}, (${source}))`;
 }

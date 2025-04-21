@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-import type { Builtins } from '../utils/isomorphic/builtins';
 import type { source } from '../utils/isomorphic/utilityScriptSerializers';
 import type * as channels from '@protocol/channels';
 
 export type Storage = Omit<channels.OriginStorage, 'origin'>;
 
-export async function collect(serializersSource: typeof source, builtins: Builtins, isFirefox: boolean, recordIndexedDB: boolean): Promise<Storage> {
-  const { serializeAsCallArgument } = serializersSource(builtins);
+export async function collect(serializersSource: typeof source, isFirefox: boolean, recordIndexedDB: boolean): Promise<Storage> {
+  const { serializeAsCallArgument } = serializersSource();
 
   async function collectDB(dbInfo: IDBDatabaseInfo) {
     if (!dbInfo.name)
@@ -132,8 +131,8 @@ export async function collect(serializersSource: typeof source, builtins: Builti
   };
 }
 
-export async function restore(serializersSource: typeof source, builtins: Builtins, originState: channels.SetOriginStorage) {
-  const { parseEvaluationResultValue } = serializersSource(builtins);
+export async function restore(serializersSource: typeof source, originState: channels.SetOriginStorage) {
+  const { parseEvaluationResultValue } = serializersSource();
 
   for (const { name, value } of (originState.localStorage || []))
     localStorage.setItem(name, value);

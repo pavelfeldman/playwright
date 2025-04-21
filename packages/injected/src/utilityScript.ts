@@ -19,11 +19,10 @@ import { source } from '@isomorphic/utilityScriptSerializers';
 
 export class UtilityScript {
   constructor(isUnderTest: boolean) {
-    if (isUnderTest) {
-      // eslint-disable-next-line no-restricted-globals
-      (globalThis as any).builtins = builtins();
-    }
-    const result = source(builtins());
+    const builtinsObject = builtins();
+    if (isUnderTest)
+      (globalThis as any).builtins = builtinsObject;
+    const result = source();
     this.serializeAsCallArgument = result.serializeAsCallArgument;
     this.parseEvaluationResultValue = result.parseEvaluationResultValue;
   }
@@ -38,7 +37,7 @@ export class UtilityScript {
     for (let i = 0; i < args.length; i++)
       parameters[i] = this.parseEvaluationResultValue(args[i], handles);
 
-    let result = builtins().eval(expression);
+    let result = eval(expression);
     if (isFunction === true) {
       result = result(...parameters);
     } else if (isFunction === false) {

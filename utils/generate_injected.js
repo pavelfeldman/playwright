@@ -129,6 +129,7 @@ const inlineCSSPlugin = {
       format: 'cjs',
       platform: 'browser',
       target: 'ES2019',
+      inject: [require.resolve('./generate_injected_builtins.js')],
       plugins: [inlineCSSPlugin],
     });
     for (const message of [...buildOutput.errors, ...buildOutput.warnings])

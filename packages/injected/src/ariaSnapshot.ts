@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import { Map, Set } from '@isomorphic/builtins';
 import { escapeRegExp, longestCommonSubstring, normalizeWhiteSpace } from '@isomorphic/stringUtils';
 
 import { getElementComputedStyle, getGlobalOptions } from './domUtils';
