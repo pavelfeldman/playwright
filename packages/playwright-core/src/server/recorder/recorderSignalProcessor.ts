@@ -65,6 +65,9 @@ export class RecorderSignalProcessor {
             name: 'navigate',
             url: frame.url(),
             signals: [],
+            snapshot: {
+              ariaSnapshot: '',
+            },
           },
           startTime: timestamp,
           endTime: timestamp,

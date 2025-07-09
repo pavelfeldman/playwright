@@ -168,9 +168,11 @@ class InspectTool implements RecorderTool {
 
   private _commit(selector: string, model: HighlightModel) {
     if (this._assertVisibility) {
+      const snapshot = this._recorder.snapshotForAction(model.elements[0] as HTMLElement | undefined, 'assertVisible');
       this._recorder.recordAction({
         name: 'assertVisible',
         selector,
+        snapshot,
         signals: [],
       });
       this._recorder.setMode('recording');
@@ -248,13 +250,17 @@ class RecordActionTool implements RecorderTool {
     if (this._consumedDueToNoModel(event, this._hoveredModel))
       return;
 
-    const checkbox = asCheckbox(this._recorder.deepEventTarget(event));
+    const element = this._recorder.deepEventTarget(event);
+    const snapshot = this._recorder.snapshotForAction(element, 'check');
+
+    const checkbox = asCheckbox(element);
     if (checkbox && event.detail === 1) {
       // Interestingly, inputElement.checked is reversed inside this event handler.
       this._performAction({
         name: checkbox.checked ? 'check' : 'uncheck',
         selector: this._hoveredModel!.selector,
         signals: [],
+        snapshot,
       });
       return;
     }
@@ -271,7 +277,8 @@ class RecordActionTool implements RecorderTool {
           signals: [],
           button: buttonForEvent(event),
           modifiers: modifiersForEvent(event),
-          clickCount: event.detail
+          clickCount: event.detail,
+          snapshot,
         },
         timeout: this._recorder.injectedScript.utils.builtins.setTimeout(() => this._commitPendingClickAction(), 200)
       };
@@ -291,6 +298,9 @@ class RecordActionTool implements RecorderTool {
 
     this._cancelPendingClickAction();
 
+    const element = this._recorder.deepEventTarget(event);
+    const snapshot = this._recorder.snapshotForAction(element, 'click');
+
     this._performAction({
       name: 'click',
       selector: this._hoveredModel!.selector,
@@ -298,7 +308,8 @@ class RecordActionTool implements RecorderTool {
       signals: [],
       button: buttonForEvent(event),
       modifiers: modifiersForEvent(event),
-      clickCount: event.detail
+      clickCount: event.detail,
+      snapshot,
     });
   }
 
@@ -325,6 +336,8 @@ class RecordActionTool implements RecorderTool {
     if (this._consumedDueToNoModel(event, this._hoveredModel))
       return;
 
+    const element = this._recorder.deepEventTarget(event);
+    const snapshot = this._recorder.snapshotForAction(element, 'click');
     this._performAction({
       name: 'click',
       selector: this._hoveredModel!.selector,
@@ -332,7 +345,8 @@ class RecordActionTool implements RecorderTool {
       signals: [],
       button: 'right',
       modifiers: 0,
-      clickCount: 0
+      clickCount: 0,
+      snapshot,
     });
   }
 
@@ -386,22 +400,26 @@ class RecordActionTool implements RecorderTool {
     const target = this._recorder.deepEventTarget(event);
 
     if (target.nodeName === 'INPUT' && (target as HTMLInputElement).type.toLowerCase() === 'file') {
+      const snapshot = this._recorder.snapshotForAction(target, 'setInputFiles');
       this._recorder.recordAction({
         name: 'setInputFiles',
         selector: this._activeModel!.selector,
         signals: [],
         files: [...((target as HTMLInputElement).files || [])].map(file => file.name),
+        snapshot,
       });
       return;
     }
 
     if (isRangeInput(target)) {
+      const snapshot = this._recorder.snapshotForAction(target, 'fill');
       this._recorder.recordAction({
         name: 'fill',
         // must use hoveredModel instead of activeModel for it to work in webkit
         selector: this._hoveredModel!.selector,
         signals: [],
         text: target.value,
+        snapshot,
       });
       return;
     }
@@ -415,11 +433,13 @@ class RecordActionTool implements RecorderTool {
       // Non-navigating actions are simply recorded by Playwright.
       if (this._consumedDueWrongTarget(event))
         return;
+      const snapshot = this._recorder.snapshotForAction(target, 'fill');
       this._recorder.recordAction({
         name: 'fill',
         selector: this._activeModel!.selector,
         signals: [],
         text: target.isContentEditable ? target.innerText : (target as HTMLInputElement).value,
+        snapshot,
       });
     }
 
@@ -427,11 +447,13 @@ class RecordActionTool implements RecorderTool {
       const selectElement = target as HTMLSelectElement;
       if (this._actionInProgress(event))
         return;
+      const snapshot = this._recorder.snapshotForAction(target, 'select');
       this._performAction({
         name: 'select',
         selector: this._activeModel!.selector,
         options: [...selectElement.selectedOptions].map(option => option.value),
-        signals: []
+        signals: [],
+        snapshot,
       });
     }
   }
@@ -446,24 +468,30 @@ class RecordActionTool implements RecorderTool {
     if (this._consumedDueWrongTarget(event))
       return;
     // Similarly to click, trigger checkbox on key event, not input.
+    const element = this._recorder.deepEventTarget(event);
+
     if (event.key === ' ') {
-      const checkbox = asCheckbox(this._recorder.deepEventTarget(event));
+      const checkbox = asCheckbox(element);
       if (checkbox && event.detail === 0) {
+        const snapshot = this._recorder.snapshotForAction(element, 'check');
         this._performAction({
           name: checkbox.checked ? 'uncheck' : 'check',
           selector: this._activeModel!.selector,
           signals: [],
+          snapshot,
         });
         return;
       }
     }
 
+    const snapshot = this._recorder.snapshotForAction(element, 'press');
     this._performAction({
       name: 'press',
       selector: this._activeModel!.selector,
       signals: [],
       key: event.key,
       modifiers: modifiersForEvent(event),
+      snapshot,
     });
   }
 
@@ -650,14 +678,14 @@ class JsonRecordActionTool implements RecorderTool {
       return;
 
     const checkbox = asCheckbox(element);
-    const { ariaSnapshot, selector } = this._ariaSnapshot(element);
+    const { snapshot, selector } = this._snapshotAndSelector(element, 'check');
     if (checkbox && event.detail === 1) {
       // Interestingly, inputElement.checked is reversed inside this event handler.
       this._recorder.recordAction({
         name: checkbox.checked ? 'check' : 'uncheck',
         selector,
         signals: [],
-        ariaSnapshot,
+        snapshot,
       });
       return;
     }
@@ -665,7 +693,7 @@ class JsonRecordActionTool implements RecorderTool {
     this._recorder.recordAction({
       name: 'click',
       selector,
-      ariaSnapshot,
+      snapshot,
       position: positionForEvent(event),
       signals: [],
       button: buttonForEvent(event),
@@ -681,11 +709,11 @@ class JsonRecordActionTool implements RecorderTool {
     if (this._shouldIgnoreMouseEvent(event))
       return;
 
-    const { ariaSnapshot, selector } = this._ariaSnapshot(element);
+    const { snapshot, selector } = this._snapshotAndSelector(element, 'click');
     this._recorder.recordAction({
       name: 'click',
       selector,
-      ariaSnapshot,
+      snapshot,
       position: positionForEvent(event),
       signals: [],
       button: buttonForEvent(event),
@@ -697,12 +725,12 @@ class JsonRecordActionTool implements RecorderTool {
   onInput(event: Event) {
     const element = this._recorder.deepEventTarget(event);
 
-    const { ariaSnapshot, selector } = this._ariaSnapshot(element);
     if (isRangeInput(element)) {
+      const { snapshot, selector } = this._snapshotAndSelector(element, 'fill');
       this._recorder.recordAction({
         name: 'fill',
         selector,
-        ariaSnapshot,
+        snapshot,
         signals: [],
         text: element.value,
       });
@@ -715,10 +743,11 @@ class JsonRecordActionTool implements RecorderTool {
         return;
       }
 
+      const { snapshot, selector } = this._snapshotAndSelector(element, 'fill');
       this._recorder.recordAction({
         name: 'fill',
         selector,
-        ariaSnapshot,
+        snapshot,
         signals: [],
         text: element.isContentEditable ? element.innerText : (element as HTMLInputElement).value,
       });
@@ -727,10 +756,11 @@ class JsonRecordActionTool implements RecorderTool {
 
     if (element.nodeName === 'SELECT') {
       const selectElement = element as HTMLSelectElement;
+      const { snapshot, selector } = this._snapshotAndSelector(element, 'select');
       this._recorder.recordAction({
         name: 'select',
         selector,
-        ariaSnapshot,
+        snapshot,
         options: [...selectElement.selectedOptions].map(option => option.value),
         signals: []
       });
@@ -743,26 +773,27 @@ class JsonRecordActionTool implements RecorderTool {
       return;
 
     const element = this._recorder.deepEventTarget(event);
-    const { ariaSnapshot, selector } = this._ariaSnapshot(element);
 
     // Similarly to click, trigger checkbox on key event, not input.
     if (event.key === ' ') {
       const checkbox = asCheckbox(element);
       if (checkbox && event.detail === 0) {
+        const { snapshot, selector } = this._snapshotAndSelector(element, 'check');
         this._recorder.recordAction({
           name: checkbox.checked ? 'uncheck' : 'check',
           selector,
-          ariaSnapshot,
+          snapshot,
           signals: [],
         });
         return;
       }
     }
 
+    const { snapshot, selector } = this._snapshotAndSelector(element, 'press');
     this._recorder.recordAction({
       name: 'press',
       selector,
-      ariaSnapshot,
+      snapshot,
       signals: [],
       key: event.key,
       modifiers: modifiersForEvent(event),
@@ -819,12 +850,10 @@ class JsonRecordActionTool implements RecorderTool {
     return false;
   }
 
-  private _ariaSnapshot(element: HTMLElement): { ariaSnapshot: string, selector: string };
-  private _ariaSnapshot(element: HTMLElement | undefined): { ariaSnapshot: string, selector?: string } {
-    const { ariaSnapshot, refs } = this._recorder.injectedScript.ariaSnapshotForRecorder();
-    const ref = element ? refs.get(element) : undefined;
-    const selector = ref ? `aria-ref=${ref}` : undefined;
-    return { ariaSnapshot, selector };
+  private _snapshotAndSelector(element: HTMLElement, actionName: actions.Action['name']) {
+    const snapshot = this._recorder.snapshotForAction(element, actionName);
+    const { selector } = this._recorder.injectedScript.generateSelector(element, { testIdAttributeName: this._recorder.state.testIdAttributeName });
+    return { snapshot, selector };
   }
 }
 
@@ -913,22 +942,27 @@ class TextAssertionTool implements RecorderTool {
     const target = this._hoverHighlight?.elements[0];
     if (!target)
       return null;
+
     if (this._kind === 'value') {
       if (!this._elementHasValue(target))
         return null;
       const { selector } = this._recorder.injectedScript.generateSelector(target, { testIdAttributeName: this._recorder.state.testIdAttributeName });
       if (target.nodeName === 'INPUT' && ['checkbox', 'radio'].includes((target as HTMLInputElement).type.toLowerCase())) {
+        const snapshot = this._recorder.snapshotForAction(target as HTMLElement, 'assertChecked');
         return {
           name: 'assertChecked',
           selector,
+          snapshot,
           signals: [],
           // Interestingly, inputElement.checked is reversed inside this event handler.
           checked: !(target as HTMLInputElement).checked,
         };
       } else {
+        const snapshot = this._recorder.snapshotForAction(target as HTMLElement, 'assertValue');
         return {
           name: 'assertValue',
           selector,
+          snapshot,
           signals: [],
           value: (target as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)).value,
         };
@@ -939,9 +973,11 @@ class TextAssertionTool implements RecorderTool {
       // forTextExpect can update the target, re-highlight it.
       this._recorder.updateHighlight(this._hoverHighlight, true);
 
+      const snapshot = this._recorder.snapshotForAction(target as HTMLElement, 'assertSnapshot');
       return {
         name: 'assertSnapshot',
         selector: this._hoverHighlight.selector,
+        snapshot,
         signals: [],
         ariaSnapshot: this._recorder.injectedScript.ariaSnapshot(target, { mode: 'regex' }),
       };
@@ -951,9 +987,11 @@ class TextAssertionTool implements RecorderTool {
       // forTextExpect can update the target, re-highlight it.
       this._recorder.updateHighlight(this._hoverHighlight, true);
 
+      const snapshot = this._recorder.snapshotForAction(target as HTMLElement, 'assertText');
       return {
         name: 'assertText',
         selector: this._hoverHighlight.selector,
+        snapshot,
         signals: [],
         text: this._recorder.injectedScript.utils.elementText(this._textCache, target).normalized,
         substring: true,
@@ -1263,6 +1301,7 @@ export class Recorder {
   };
   readonly document: Document;
   private _delegate: RecorderDelegate = {};
+  private _snapshotForFill: { element: HTMLElement, snapshot: actions.SnapshotWithRef } | undefined;
 
   constructor(injectedScript: InjectedScript, options?: { recorderMode?: 'default' | 'api' }) {
     this.document = injectedScript.document;
@@ -1569,10 +1608,13 @@ export class Recorder {
   }
 
   async performAction(action: actions.PerformOnRecordAction) {
+    this._snapshotForFill = undefined;
     await this._delegate.performAction?.(action).catch(() => {});
   }
 
   recordAction(action: actions.Action) {
+    if (action.name !== 'fill')
+      this._snapshotForFill = undefined;
     void this._delegate.recordAction?.(action);
   }
 
@@ -1583,6 +1625,16 @@ export class Recorder {
   elementPicked(selector: string, model: HighlightModel) {
     const ariaSnapshot = this.injectedScript.ariaSnapshot(model.elements[0]);
     void this._delegate.elementPicked?.({ selector, ariaSnapshot });
+  }
+
+  snapshotForAction(element: HTMLElement | undefined, actionName: actions.Action['name']): actions.SnapshotWithRef {
+    if (actionName === 'fill' && this._snapshotForFill && this._snapshotForFill.element === element)
+      return this._snapshotForFill.snapshot;
+
+    const { ariaSnapshot, refs } = this.injectedScript.ariaSnapshotForRecorder();
+    const ref = element ? refs.get(element) : undefined;
+    const elementRef = ref ? `aria-ref=${ref}` : undefined;
+    return { ariaSnapshot, elementRef };
   }
 }
 

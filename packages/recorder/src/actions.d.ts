@@ -33,10 +33,15 @@ export type ActionName =
   'assertVisible' |
   'assertSnapshot';
 
+export type SnapshotWithRef = {
+  ariaSnapshot: string,
+  elementRef?: string,
+};
+  
 export type ActionBase = {
   name: ActionName,
   signals: Signal[],
-  ariaSnapshot?: string,
+  snapshot: SnapshotWithRef,
 };
 
 export type ActionWithSelector = ActionBase & {

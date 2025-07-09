@@ -276,9 +276,7 @@ function quote(text: string) {
 }
 
 function wrapWithStep(description: string | undefined, body: string) {
-  return description ? `await test.step(\`${description}\`, async () => {
-${body}
-});` : body;
+  return description ? `// ${description}\n${body}` : body;
 }
 
 export function quoteMultiline(text: string, indent = '  ') {

@@ -31,6 +31,7 @@ import { eventsHelper, monotonicTime } from './../utils';
 import { Frame } from './frames';
 import { Page } from './page';
 import { performAction } from './recorder/recorderRunner';
+import { generateDescription } from './recorder/llmUtil';
 
 import type { Language } from './codegen/types';
 import type { CallMetadata, InstrumentationListener, SdkObject } from './instrumentation';
@@ -444,6 +445,9 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
         action: {
           name: 'closePage',
           signals: [],
+          snapshot: {
+            ariaSnapshot: '',
+          },
         },
         startTime: monotonicTime()
       });
@@ -470,6 +474,9 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
           name: 'openPage',
           url: page.mainFrame().url(),
           signals: [],
+          snapshot: {
+            ariaSnapshot: '',
+          },
         },
         startTime: monotonicTime()
       });
@@ -511,10 +518,11 @@ export class Recorder extends EventEmitter<RecorderEventMap> implements Instrume
 
   private async _createActionInContext(frame: Frame, action: actions.Action): Promise<actions.ActionInContext> {
     const frameDescription = await this._describeFrame(frame);
+    const description = await generateDescription(action);
     const actionInContext: actions.ActionInContext = {
       frame: frameDescription,
       action,
-      description: undefined,
+      description,
       startTime: monotonicTime(),
     };
     return actionInContext;
