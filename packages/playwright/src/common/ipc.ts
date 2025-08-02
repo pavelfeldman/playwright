@@ -130,6 +130,10 @@ export type DonePayload = {
   fatalUnknownTestIds?: string[];
 };
 
+export type ResumeAfterStepErrorPayload = {
+  disposition: 'continue' | 'throw';
+};
+
 export type TestOutputPayload = {
   text?: string;
   buffer?: string;

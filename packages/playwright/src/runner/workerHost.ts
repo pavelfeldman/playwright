@@ -79,6 +79,10 @@ export class WorkerHost extends ProcessHost {
     this.sendMessageNoReply({ method: 'runTestGroup', params: runPayload });
   }
 
+  resumeAfterStepError(disposition: 'continue' | 'throw') {
+    this.sendMessageNoReply({ method: 'resumeAfterStepError', params: { disposition } });
+  }
+
   hash() {
     return this._hash;
   }

@@ -33,7 +33,7 @@ import { loadTestFile } from '../common/testLoader';
 import type { TimeSlot } from './timeoutManager';
 import type { Location } from '../../types/testReporter';
 import type { FullConfigInternal, FullProjectInternal } from '../common/config';
-import type { DonePayload, RunPayload, TeardownErrorsPayload, TestBeginPayload, TestEndPayload, TestInfoErrorImpl, WorkerInitParams } from '../common/ipc';
+import type { DonePayload, ResumeAfterStepErrorPayload, RunPayload, TeardownErrorsPayload, TestBeginPayload, TestEndPayload, TestInfoErrorImpl, WorkerInitParams } from '../common/ipc';
 import type { Suite, TestCase } from '../common/test';
 import type { TestAnnotation } from '../../types/test';
 
@@ -257,6 +257,10 @@ export class WorkerMain extends ProcessRunner {
       this._skipRemainingTestsInSuite = undefined;
       this._runFinished.resolve();
     }
+  }
+
+  resumeAfterStepError(params: ResumeAfterStepErrorPayload): void {
+    this._currentTest?.resumeAfterStepError(params.disposition);
   }
 
   private async _runTest(test: TestCase, retry: number, nextTest: TestCase | undefined) {

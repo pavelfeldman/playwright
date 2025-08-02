@@ -33,7 +33,7 @@ export interface ClientInstrumentation {
   removeListener(listener: ClientInstrumentationListener): void;
   removeAllListeners(): void;
   onApiCallBegin(apiCall: ApiCallData, channel: { type: string, method: string, params?: Record<string, any> }): void;
-  onApiCallEnd(apiCal: ApiCallData): void;
+  onApiCallEnd(apiCall: ApiCallData, recoveryHandlers?: Promise<any>[]): void;
   onWillPause(options: { keepTestTimeout: boolean }): void;
 
   runAfterCreateBrowserContext(context: BrowserContext): Promise<void>;
@@ -44,7 +44,7 @@ export interface ClientInstrumentation {
 
 export interface ClientInstrumentationListener {
   onApiCallBegin?(apiCall: ApiCallData, channel: { type: string, method: string, params?: Record<string, any>  }): void;
-  onApiCallEnd?(apiCall: ApiCallData): void;
+  onApiCallEnd?(apiCall: ApiCallData, recoveryHandlers: Promise<any>[]): void;
   onWillPause?(options: { keepTestTimeout: boolean }): void;
 
   runAfterCreateBrowserContext?(context: BrowserContext): Promise<void>;

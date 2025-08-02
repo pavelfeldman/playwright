@@ -17,7 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { captureRawStack, monotonicTime, sanitizeForFilePath, stringifyStackFrames, currentZone, createGuid } from 'playwright-core/lib/utils';
+import { captureRawStack, monotonicTime, sanitizeForFilePath, stringifyStackFrames, currentZone, createGuid, ManualPromise } from 'playwright-core/lib/utils';
 
 import { TimeoutManager, TimeoutManagerError, kMaxDeadline } from './timeoutManager';
 import { addSuffixToFilePath, filteredStackTrace, getContainedPath, normalizeAndSaveAttachment, sanitizeFilePathBeforeExtension, trimLongString, windowsFilesystemFriendlyLength } from '../util';
@@ -35,8 +35,8 @@ import type { StackFrame } from '@protocol/channels';
 import type { TestStepCategory } from '../util';
 
 export interface TestStepInternal {
-  complete(result: { error?: Error | unknown, suggestedRebaseline?: string }): void;
-  info: TestStepInfoImpl
+  complete(result: { error?: Error | unknown, suggestedRebaseline?: string }): { recoveryHandler?: Promise<'continue' | 'throw'> };
+  info: TestStepInfoImpl;
   attachmentIndices: number[];
   stepId: string;
   title: string;
@@ -112,6 +112,7 @@ export class TestInfoImpl implements TestInfo {
   readonly snapshotDir: string;
   errors: TestInfoErrorImpl[] = [];
   readonly _attachmentsPush: (...items: TestInfo['attachments']) => number;
+  private _stepRecoveryHandlerResult: ManualPromise<'continue' | 'throw'> | undefined;
 
   get error(): TestInfoErrorImpl | undefined {
     return this.errors[0];
@@ -289,7 +290,7 @@ export class TestInfoImpl implements TestInfo {
       info: new TestStepInfoImpl(this, stepId, data.title, parentStep?.info),
       complete: result => {
         if (step.endWallTime)
-          return;
+          return {};
 
         step.endWallTime = Date.now();
         if (result.error) {
@@ -326,6 +327,12 @@ export class TestInfoImpl implements TestInfo {
         const errorForTrace = step.error ? { name: '', message: step.error.message || '', stack: step.error.stack } : undefined;
         const attachments = attachmentIndices.map(i => this.attachments[i]);
         this._tracing.appendAfterActionForStep(stepId, errorForTrace, attachments, step.info.annotations);
+        const recoveryEnabled = true;
+        if (recoveryEnabled && step.error) {
+          this._stepRecoveryHandlerResult = new ManualPromise();
+          return { recoveryHandler: this._stepRecoveryHandlerResult };
+        }
+        return {};
       }
     };
     const parentStepList = parentStep ? parentStep.steps : this._steps;
@@ -348,6 +355,10 @@ export class TestInfoImpl implements TestInfo {
       stack: data.location ? [data.location] : []
     });
     return step;
+  }
+
+  resumeAfterStepError(disposition: 'continue' | 'throw') {
+    this._stepRecoveryHandlerResult?.resolve(disposition);
   }
 
   _interrupt() {

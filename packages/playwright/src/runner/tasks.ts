@@ -42,6 +42,7 @@ import type { FullResult } from '../../types/testReporter';
 import type { FullConfigInternal, FullProjectInternal } from '../common/config';
 import type { InternalReporter } from '../reporters/internalReporter';
 import type { ManualPromise } from 'playwright-core/lib/utils';
+import type { RecoveryHandler } from './failureTracker';
 
 const readDirAsync = promisify(fs.readdir);
 
@@ -65,10 +66,11 @@ export class TestRun {
   projectFiles: Map<FullProjectInternal, string[]> = new Map();
   projectSuites: Map<FullProjectInternal, Suite[]> = new Map();
 
-  constructor(config: FullConfigInternal, reporter: InternalReporter) {
+  constructor(config: FullConfigInternal, reporter: InternalReporter, recoveryHandler?: RecoveryHandler) {
     this.config = config;
     this.reporter = reporter;
-    this.failureTracker = new FailureTracker(config);
+    recoveryHandler = recoveryHandler || (async () => 'throw');
+    this.failureTracker = new FailureTracker(config, recoveryHandler);
   }
 }
 

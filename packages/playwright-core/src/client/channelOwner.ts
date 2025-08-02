@@ -198,11 +198,15 @@ export abstract class ChannelOwner<T extends channels.Channel = channels.Channel
         e.stack = e.message + stackFrames;
       else
         e.stack = '';
+      const recoveryHandlers: Promise<'continue' | 'throw'>[] = [];
       if (!options?.internal) {
         apiZone.error = e;
         logApiCall(this._platform, logger, `<= ${apiZone.apiName} failed`);
-        this._instrumentation.onApiCallEnd(apiZone);
+        this._instrumentation.onApiCallEnd(apiZone, recoveryHandlers);
       }
+      const disposition = await recoveryHandlers[0];
+      if (disposition === 'continue')
+        return undefined as any;
       throw e;
     }
   }

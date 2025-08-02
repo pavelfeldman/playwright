@@ -366,7 +366,7 @@ class ExpectMetaInfoProxyHandler implements ProxyHandler<any> {
 
       const step = testInfo._addStep(stepInfo);
 
-      const reportStepError = (e: Error | unknown) => {
+      const reportStepError = (isAsync: boolean, e: Error | unknown) => {
         const jestError = isJestError(e) ? e : null;
         const error = jestError ? new ExpectError(jestError, customMessage, stackFrames) : e;
         if (jestError?.matcherResult.suggestedRebaseline) {
@@ -375,11 +375,26 @@ class ExpectMetaInfoProxyHandler implements ProxyHandler<any> {
           step.complete({ suggestedRebaseline: jestError?.matcherResult.suggestedRebaseline });
           return;
         }
-        step.complete({ error });
-        if (this._info.isSoft)
-          testInfo._failWithError(error);
-        else
-          throw error;
+        if (!isAsync) {
+          step.complete({ error });
+          if (this._info.isSoft)
+            testInfo._failWithError(error);
+          else
+            throw error;
+          return;
+        }
+
+        // Allow for recovery from async errors.
+        const { recoveryHandler } = step.complete({ error });
+        return (async () => {
+          const disposition = await recoveryHandler;
+          if (disposition === 'continue')
+            return undefined as any;
+          if (this._info.isSoft)
+            testInfo._failWithError(error);
+          else
+            throw error;
+        })();
       };
 
       const finalizer = () => {
@@ -391,11 +406,11 @@ class ExpectMetaInfoProxyHandler implements ProxyHandler<any> {
         const callback = () => matcher.call(target, ...args);
         const result = currentZone().with('stepZone', step).run(callback);
         if (result instanceof Promise)
-          return result.then(finalizer).catch(reportStepError);
+          return result.then(finalizer).catch(reportStepError.bind(null, true));
         finalizer();
         return result;
       } catch (e) {
-        reportStepError(e);
+        void reportStepError(false, e);
       }
     };
   }

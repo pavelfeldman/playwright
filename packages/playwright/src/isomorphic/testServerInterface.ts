@@ -113,6 +113,8 @@ export interface TestServerInterface {
   stopTests(params: {}): Promise<void>;
 
   closeGracefully(params: {}): Promise<void>;
+
+  resumeAfterStepError(params: { disposition: 'continue' | 'throw' }): Promise<void>;
 }
 
 export interface TestServerInterfaceEvents {
@@ -127,4 +129,5 @@ export interface TestServerInterfaceEventEmitters {
   dispatchEvent(event: 'stdio', params: { type: 'stdout' | 'stderr', text?: string, buffer?: string }): void;
   dispatchEvent(event: 'testFilesChanged', params: { testFiles: string[] }): void;
   dispatchEvent(event: 'loadTraceRequested', params: { traceUrl: string }): void;
+  dispatchEvent(event: 'recoverFromStepError', params: { message: string, location: reporterTypes.Location }): void;
 }

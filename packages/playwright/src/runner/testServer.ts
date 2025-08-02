@@ -79,7 +79,10 @@ export class TestServerDispatcher implements TestServerInterface {
   private _ignoredProjectOutputs = new Set<string>();
   private _watchedTestDependencies = new Set<string>();
 
-  private _testRun: { run: Promise<reporterTypes.FullResult['status']>, stop: ManualPromise<void> } | undefined;
+  private _testRun: {
+    run: Promise<reporterTypes.FullResult['status']>,
+    stop: ManualPromise<void>,
+  } | undefined;
   readonly transport: Transport;
   private _queue = Promise.resolve();
   private _globalSetup: { cleanup: () => Promise<any>, report: ReportEntry[] } | undefined;
@@ -90,6 +93,7 @@ export class TestServerDispatcher implements TestServerInterface {
   private _watchTestDirs = false;
   private _closeOnDisconnect = false;
   private _populateDependenciesOnList = false;
+  private _resumeAfterStepError: ManualPromise<'continue' | 'throw'> | undefined;
 
   constructor(configLocation: ConfigLocation, configCLIOverrides: ConfigCLIOverrides) {
     this._configLocation = configLocation;
@@ -348,12 +352,24 @@ export class TestServerDispatcher implements TestServerInterface {
       createLoadTask('out-of-process', { filterOnly: true, failOnLoadErrors: false, doNotRunDepsOutsideProjectFilter: true }),
       ...createRunTestsTasks(config),
     ];
-    const run = runTasks(new TestRun(config, reporter), tasks, 0, stop).then(async status => {
+    const run = runTasks(new TestRun(config, reporter, this._recoverFromStepError.bind(this)), tasks, 0, stop).then(async status => {
       this._testRun = undefined;
       return status;
     });
     this._testRun = { run, stop };
     return { status: await run };
+  }
+
+  private async _recoverFromStepError(test: reporterTypes.TestCase, result: reporterTypes.TestResult, step: reporterTypes.TestStep): Promise<'continue' | 'throw'> {
+    this._resumeAfterStepError = new ManualPromise();
+    if (!step.error?.message || !step.error?.location)
+      return 'throw';
+    this._dispatchEvent('recoverFromStepError', { message: step.error.message, location: step.error.location });
+    return this._resumeAfterStepError;
+  }
+
+  async resumeAfterStepError(params: { disposition: 'continue' | 'throw' }): Promise<void> {
+    this._resumeAfterStepError?.resolve(params.disposition);
   }
 
   async watch(params: { fileNames: string[]; }) {

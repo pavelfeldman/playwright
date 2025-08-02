@@ -374,7 +374,7 @@ class JobDispatcher {
     this._reporter.onStepBegin?.(test, result, step);
   }
 
-  private _onStepEnd(params: StepEndPayload) {
+  private _onStepEnd(resumeAfterStepError: (disposition: 'continue' | 'throw') => void, params: StepEndPayload) {
     const data = this._dataByTestId.get(params.testId);
     if (!data) {
       // The test has finished, but steps are still coming. Just ignore them.
@@ -394,6 +394,8 @@ class JobDispatcher {
     step.annotations = params.annotations;
     steps.delete(params.stepId);
     this._reporter.onStepEnd?.(test, result, step);
+    if (step.error)
+      this._failureTracker.onStepError(test, result, step, resumeAfterStepError);
   }
 
   private _onAttach(params: AttachmentPayload) {
@@ -560,12 +562,13 @@ class JobDispatcher {
       }),
     };
     worker.runTestGroup(runPayload);
+    const resumeAfterStepError = worker.resumeAfterStepError.bind(worker);
 
     this._listeners = [
       eventsHelper.addEventListener(worker, 'testBegin', this._onTestBegin.bind(this)),
       eventsHelper.addEventListener(worker, 'testEnd', this._onTestEnd.bind(this)),
       eventsHelper.addEventListener(worker, 'stepBegin', this._onStepBegin.bind(this)),
-      eventsHelper.addEventListener(worker, 'stepEnd', this._onStepEnd.bind(this)),
+      eventsHelper.addEventListener(worker, 'stepEnd', this._onStepEnd.bind(this, resumeAfterStepError)),
       eventsHelper.addEventListener(worker, 'attach', this._onAttach.bind(this)),
       eventsHelper.addEventListener(worker, 'done', this._onDone.bind(this)),
       eventsHelper.addEventListener(worker, 'exit', this.onExit.bind(this)),

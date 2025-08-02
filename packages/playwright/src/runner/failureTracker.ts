@@ -14,16 +14,20 @@
  * limitations under the License.
  */
 
-import type { TestResult } from '../../types/testReporter';
+import type { TestResult, TestStep } from '../../types/testReporter';
 import type { FullConfigInternal } from '../common/config';
 import type { Suite, TestCase } from '../common/test';
+
+export type RecoveryHandler = (test: TestCase, result: TestResult, step: TestStep) => Promise<'continue' | 'throw'>;
 
 export class FailureTracker {
   private _failureCount = 0;
   private _hasWorkerErrors = false;
   private _rootSuite: Suite | undefined;
+  private _recoveryHandler: RecoveryHandler;
 
-  constructor(private _config: FullConfigInternal) {
+  constructor(private _config: FullConfigInternal, recoveryHandler: RecoveryHandler) {
+    this._recoveryHandler = recoveryHandler;
   }
 
   onRootSuite(rootSuite: Suite) {
@@ -34,6 +38,10 @@ export class FailureTracker {
     // Test is considered failing after the last retry.
     if (test.outcome() === 'unexpected' && test.results.length > test.retries)
       ++this._failureCount;
+  }
+
+  onStepError(test: TestCase, result: TestResult, step: TestStep, resumeAfterStepError: (disposition: 'continue' | 'throw') => void) {
+    void this._recoveryHandler(test, result, step).then(resumeAfterStepError).catch(() => {});
   }
 
   onWorkerError() {

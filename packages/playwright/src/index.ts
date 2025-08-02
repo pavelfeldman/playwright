@@ -239,7 +239,7 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
       (testInfo as TestInfoImpl)._setDebugMode();
 
     playwright._defaultContextOptions = _combinedContextOptions;
-    playwright._defaultContextTimeout = actionTimeout || 0;
+    playwright._defaultContextTimeout = actionTimeout || 5000;
     playwright._defaultContextNavigationTimeout = navigationTimeout || 0;
     await use();
     playwright._defaultContextOptions = undefined;
@@ -288,7 +288,7 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
         if (data.apiName === 'tracing.group')
           tracingGroupSteps.push(step);
       },
-      onApiCallEnd: data => {
+      onApiCallEnd: (data, recoveryHandlers) => {
         // "tracing.group" step will end later, when "tracing.groupEnd" finishes.
         if (data.apiName === 'tracing.group')
           return;
@@ -298,7 +298,10 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
           return;
         }
         const step = data.userData;
-        step?.complete({ error: data.error });
+        if (step) {
+          const { recoveryHandler } = step.complete({ error: data.error });
+          recoveryHandlers?.push(recoveryHandler);
+        }
       },
       onWillPause: ({ keepTestTimeout }) => {
         if (!keepTestTimeout)
@@ -546,8 +549,8 @@ class SnapshotRecorder {
 
   private shouldCaptureUponFinish() {
     return this._mode === 'on' ||
-        (this._mode === 'only-on-failure' && this.testInfo._isFailure()) ||
-        (this._mode === 'on-first-failure' && this.testInfo._isFailure() && this.testInfo.retry === 0);
+      (this._mode === 'only-on-failure' && this.testInfo._isFailure()) ||
+      (this._mode === 'on-first-failure' && this.testInfo._isFailure() && this.testInfo.retry === 0);
   }
 
   async maybeCapture() {

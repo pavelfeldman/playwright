@@ -138,10 +138,10 @@ it('trial run should not uncheck', async ({ page }) => {
   expect(await page.evaluate(() => window['checkbox'].checked)).toBe(true);
 });
 
-it('should check the box using setChecked', async ({ page }) => {
+it.only('should check the box using setChecked', async ({ page }) => {
   await page.setContent(`<input id='checkbox' type='checkbox'></input>`);
   await page.setChecked('input', true);
   expect(await page.evaluate(() => window['checkbox'].checked)).toBe(true);
-  await page.setChecked('input', false);
-  expect(await page.evaluate(() => window['checkbox'].checked)).toBe(false);
+  await page.setChecked('input-bogus', false);
+  await expect(page.locator('input')).not.toBeChecked();
 });
