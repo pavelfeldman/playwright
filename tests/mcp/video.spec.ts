@@ -37,6 +37,18 @@ for (const mode of ['isolated', 'persistent']) {
     });
 
     expect(await client.callTool({
+      name: 'browser_evaluate',
+      arguments: {
+        function: `async () => {
+          document.body.innerHTML = '<div style="background-color: red; width: 100px; height: 100px;">Hello, world!</div>';
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }`,
+      },
+    })).toHaveResponse({
+      code: expect.stringContaining(`page.evaluate`),
+    });
+
+    expect(await client.callTool({
       name: 'browser_close',
     })).toHaveResponse({
       code: expect.stringContaining(`page.close()`),
