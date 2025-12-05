@@ -23,7 +23,7 @@ import { setBoxedStackPrefixes, createGuid, currentZone, debugMode, jsonStringif
 import { currentTestInfo } from './common/globals';
 import { rootTestType } from './common/testType';
 import { createCustomMessageHandler } from './mcp/test/browserBackend';
-import { performTask } from './agents/performTask';
+import { createPerformCacheForTest, patchPageWithPerform, PerformTestCache } from './agents/performTask';
 
 import type { Fixtures, PlaywrightTestArgs, PlaywrightTestOptions, PlaywrightWorkerArgs, PlaywrightWorkerOptions, ScreenshotMode, TestInfo, TestType, VideoMode } from '../types/test';
 import type { ContextReuseMode } from './common/config';
@@ -36,7 +36,6 @@ import type { APIRequestContext as APIRequestContextImpl } from '../../playwrigh
 import type { ChannelOwner } from '../../playwright-core/src/client/channelOwner';
 import type { Page as PageImpl } from '../../playwright-core/src/client/page';
 import type { BrowserContext, BrowserContextOptions, LaunchOptions, Page, Tracing } from 'playwright-core';
-import type { PerformTaskOptions } from './agents/performTask';
 
 export { expect } from './matchers/expect';
 export const _baseTest: TestType<{}, {}> = rootTestType.test;
@@ -59,8 +58,8 @@ type TestFixtures = PlaywrightTestArgs & PlaywrightTestOptions & {
   _combinedContextOptions: BrowserContextOptions,
   _setupContextOptions: void;
   _setupArtifacts: void;
-  _perform: (task: string, options?: PerformTaskOptions) => Promise<void>;
   _contextFactory: (options?: BrowserContextOptions) => Promise<{ context: BrowserContext, close: () => Promise<void> }>;
+  performCache: PerformTestCache;
 };
 
 type WorkerFixtures = PlaywrightWorkerArgs & PlaywrightWorkerOptions & {
@@ -433,9 +432,12 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
     await browserImpl._wrapApiCall(() => browserImpl._disconnectFromReusedContext(closeReason), { internal: true });
   },
 
-  page: async ({ context, _reuseContext }, use) => {
+  page: async ({ context, _reuseContext, performCache }, use, testInfo) => {
     if (!_reuseContext) {
-      await use(await context.newPage());
+      const page = await context.newPage();
+      patchPageWithPerform(page);
+      (page as any).setPerformCache(createPerformCacheForTest(testInfo, performCache));
+      await use(page);
       return;
     }
 
@@ -443,8 +445,14 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
     let [page] = context.pages();
     if (!page)
       page = await context.newPage();
+    patchPageWithPerform(page);
+    (page as any).setPerformCache(createPerformCacheForTest(testInfo, performCache));
     await use(page);
   },
+
+  performCache: [async ({}, use) => {
+    await use({});
+  }, { scope: 'test' }],
 
   request: async ({ playwright }, use) => {
     const request = await playwright.request.newContext();
@@ -460,12 +468,6 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
     } else {
       await request.dispose();
     }
-  },
-
-  _perform: async ({ context }, use, testInfo) => {
-    await use(async (task: string, options?: PerformTaskOptions) => {
-      await performTask(testInfo, context, task, options ?? {});
-    });
   },
 });
 
@@ -794,4 +796,3 @@ export const test = _baseTest.extend<TestFixtures, WorkerFixtures>(playwrightFix
 export { defineConfig } from './common/configLoader';
 export { mergeTests } from './common/testType';
 export { mergeExpects } from './matchers/expect';
-export { performCache } from './agents/performTask';

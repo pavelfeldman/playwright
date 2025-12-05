@@ -14,35 +14,20 @@
  * limitations under the License.
  */
 
-// @ts-ignore
-import { performCache } from '@playwright/test';
+const cache = {};
+// export default cache;
 
-performCache({
-  file: 'perform-task.spec.ts',
-  test: 'perform task',
-  task: 'Add "Buy groceries" todo',
-  code: async ({ page }) => {
-    await page.getByRole('textbox', { name: 'What needs to be done?' }).fill('Buy groceries');
-    await page.keyboard.press('Enter');
-  },
-});
+cache['perform task > Add "Buy groceries" todo'] = async ({ page }) => {
+  await page.getByRole('textbox', { name: 'What needs to be done?' }).fill('Buy groceries');
+  await page.keyboard.press('Enter');
+};
 
-performCache({
-  file: 'perform-task.spec.ts',
-  test: 'perform task',
-  task: 'Add "Walk the dog" todo',
-  code: async ({ page }) => {
-    await page.getByRole('textbox', { name: 'What needs to be done?' }).fill('Walk the dog');
-    await page.keyboard.press('Enter');
-  },
-});
+cache['perform task > Add "Walk the dog" todo'] = async ({ page }) => {
+  await page.getByRole('textbox', { name: 'What needs to be done?' }).fill('Walk the dog');
+  await page.keyboard.press('Enter');
+};
 
-performCache({
-  file: 'perform-task.spec.ts',
-  test: 'perform task',
-  task: 'Add "Read a book" todo',
-  code: async ({ page }) => {
-    await page.getByRole('textbox', { name: 'What needs to be done?' }).fill('Read a book');
-    await page.getByRole('textbox', { name: 'What needs to be done?' }).press('Enter');
-  },
-});
+cache['perform task > Add "Read a book" todo'] = async ({ page }) => {
+  await page.getByRole('textbox', { name: 'What needs to be done?' }).fill('Read a book');
+  await page.getByRole('textbox', { name: 'What needs to be done?' }).press('Enter');
+};

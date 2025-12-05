@@ -3797,6 +3797,12 @@ export interface Page {
   }): Promise<Buffer>;
 
   /**
+   * Perform task.
+   * @param task
+   */
+  perform(task: string): Promise<void>;
+
+  /**
    * **NOTE** Use locator-based [locator.press(key[, options])](https://playwright.dev/docs/api/class-locator#locator-press)
    * instead. Read more about [locators](https://playwright.dev/docs/locators).
    *

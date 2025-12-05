@@ -2997,6 +2997,16 @@ Whether or not to generate tagged (accessible) PDF. Defaults to `false`.
 
 Whether or not to embed the document outline into the PDF. Defaults to `false`.
 
+## async method: Page.perform
+* since: v1.58
+* langs: js
+
+Perform task.
+
+### param: Page.perform.task
+* since: v1.58
+- `task` <[string]>
+
 ## async method: Page.press
 * since: v1.8
 * discouraged: Use locator-based [`method: Locator.press`] instead. Read more about [locators](../locators.md).

@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-import { test as it } from './pageTest';
-import './perform-task.cache';
+import { test } from './pageTest';
+import performCache from './perform-task.cache';
 
 // @ts-ignore
-it('perform task', async ({ page, _perform }) => {
+test.use({ performCache });
+
+test('perform task', async ({ page }) => {
   await page.goto('https://demo.playwright.dev/todomvc');
-  await _perform('Add "Buy groceries" todo');
-  await _perform('Add "Walk the dog" todo');
-  await _perform('Add "Read a book" todo');
+  await page.perform('Add "Buy groceries" todo');
+  await page.perform('Add "Walk the dog" todo');
+  await page.perform('Add "Read a book" todo');
 });
