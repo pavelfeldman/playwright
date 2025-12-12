@@ -72,7 +72,7 @@ async function perform(context: Context, userTask: string, resultSchema: loopTyp
   const { full } = await page.snapshotForAI(progress);
   const { tools, callTool } = toolsForLoop(context);
 
-  page.emit(Page.Events.AgentTurn, { role: 'user', message: userTask, usage: { inputTokens: 0, outputTokens: 0 } });
+  page.emit(Page.Events.AgentTurn, { role: 'user', message: userTask });
 
   const limits = context.limits(options);
   let turns = 0;
@@ -83,18 +83,23 @@ async function perform(context: Context, userTask: string, resultSchema: loopTyp
     callTool,
     tools,
     ...limits,
-    beforeTurn: params => {
+    onAfterTurn: ({ assistantMessage, totalUsage }) => {
       ++turns;
-      const lastReply = params.conversation.messages.findLast(m => m.role === 'assistant');
-      const usage = { inputTokens: params.usage.input, outputTokens: params.usage.output };
-      if (lastReply) {
-        const intent = lastReply?.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-        page.emit(Page.Events.AgentTurn, { role: 'assistant', message: intent, usage });
-      }
-      const toolCalls = lastReply?.content.filter(c => c.type === 'tool_call') || [];
-      for (const toolCall of toolCalls)
-        page.emit(Page.Events.AgentTurn, { role: 'tool', message: toolCall.name, usage });
-      if (!resultSchema && toolCalls.some(call => call.arguments.thatShouldBeIt))
+      const usage = { inputTokens: totalUsage.input, outputTokens: totalUsage.output };
+      const intent = assistantMessage.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+      page.emit(Page.Events.AgentTurn, { role: 'assistant', message: intent, usage });
+      const toolCalls = assistantMessage.content.filter(c => c.type === 'tool_call');
+      page.emit(Page.Events.AgentTurn, { role: 'assistant', message: `no tool calls`, usage });
+      return 'continue';
+    },
+    onBeforeToolCall: ({ toolCall }) => {
+      page.emit(Page.Events.AgentTurn, { role: 'assistant', message: `call tool "${toolCall.name}"` });
+      return 'continue';
+    },
+    onAfterToolCall: ({ toolCall }) => {
+      const suffix = toolCall.result?.isError ? 'failed' : 'succeeded';
+      page.emit(Page.Events.AgentTurn, { role: 'user', message: `tool "${toolCall.name}" ${suffix}` });
+      if (toolCall.arguments.thatShouldBeIt)
         return 'break';
       return 'continue';
     },

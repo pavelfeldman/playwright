@@ -2139,7 +2139,7 @@ export interface PageChannel extends PageEventTarget, EventTargetChannel {
 export type PageAgentTurnEvent = {
   role: string,
   message: string,
-  usage: {
+  usage?: {
     inputTokens: number,
     outputTokens: number,
   },

@@ -1183,10 +1183,10 @@ scheme.PageInitializer = tObject({
 scheme.PageAgentTurnEvent = tObject({
   role: tString,
   message: tString,
-  usage: tObject({
+  usage: tOptional(tObject({
     inputTokens: tInt,
     outputTokens: tInt,
-  }),
+  })),
 });
 scheme.PageBindingCallEvent = tObject({
   binding: tChannel(['BindingCall']),

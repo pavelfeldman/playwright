@@ -549,7 +549,7 @@ is `request`, `response` and `requestfinished`.
 - argument: <[Object]>
   - `role` <[string]>
   - `message` <[string]>
-  - `usage` <[Object]>
+  - `usage` ?<[Object]>
     - `inputTokens` <[int]>
     - `outputTokens` <[int]>
 

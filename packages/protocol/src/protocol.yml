@@ -2058,7 +2058,7 @@ Page:
         role: string
         message: string
         usage:
-          type: object
+          type: object?
           properties:
             inputTokens: int
             outputTokens: int

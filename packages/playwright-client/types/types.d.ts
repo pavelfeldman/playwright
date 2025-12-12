@@ -1044,7 +1044,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;
@@ -1266,7 +1266,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;
@@ -1376,7 +1376,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;
@@ -1598,7 +1598,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;
@@ -1708,7 +1708,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;
@@ -1818,7 +1818,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;
@@ -4888,7 +4888,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;
@@ -4898,7 +4898,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;
@@ -4908,7 +4908,7 @@ export interface Page {
 
     message: string;
 
-    usage: {
+    usage?: {
       inputTokens: number;
 
       outputTokens: number;

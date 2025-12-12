@@ -20,9 +20,9 @@ import { browserTest as test, expect } from '../config/browserTest';
 
 test.use({
   agent: {
-    provider: 'github',
-    model: 'claude-sonnet-4.5',
-    cachePathTemplate: '{testFilePath}-cache.json',
+    provider: 'anthropic', // 'github',
+    model: 'claude-sonnet-4-5', // 'claude-sonnet-4.5',
+    cachePathTemplate: '{testDir}/{testFilePath}-cache.json',
     cacheMode: process.env.UPDATE_CACHE ? 'update' : process.env.CI ? 'force' : 'auto',
     secrets: {
       'x-secret-email': 'secret-email@at-microsoft.com',
