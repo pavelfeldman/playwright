@@ -77,8 +77,26 @@ export type ExpectValue = {
   value: string;
 };
 
-export type Action = ClickAction | DragAction | HoverAction | SelectOptionAction | PressAction | PressSequentiallyAction | FillAction | SetChecked | ExpectVisible | ExpectValue;
-export type ActionWithCode = Action & {
+export type ExpectList = {
+  method: 'expectList';
+  selector: string;
+  items: string[];
+};
+
+export type Action =
+  | ClickAction
+  | DragAction
+  | HoverAction
+  | SelectOptionAction
+  | PressAction
+  | PressSequentiallyAction
+  | FillAction
+  | SetChecked
+  | ExpectVisible
+  | ExpectValue
+  | ExpectList;
+
+  export type ActionWithCode = Action & {
   code: string;
   intent?: string;
 };

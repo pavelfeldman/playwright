@@ -75,7 +75,7 @@ async function innerRunAction(progress: Progress, page: Page, action: actions.Ac
       break;
     case 'expectVisible': {
       const result = await frame.expect(progress, action.selector, { expression: 'to.be.visible', isNot: false });
-      if (result.errorMessage)
+      if (!result.matches)
         throw new Error(result.errorMessage);
       break;
     }
@@ -94,6 +94,12 @@ async function innerRunAction(progress: Progress, page: Page, action: actions.Ac
         throw new Error(result.errorMessage);
       break;
     }
+    case 'expectList': {
+      const expectedText = serializeExpectedTextValues(action.items, { normalizeWhiteSpace: true, ignoreCase: false });
+      const result = await frame.expect(progress, action.selector, { expression: 'to.have.text.array', expectedText, isNot: false });
+      if (!result.matches)
+        throw new Error(result.errorMessage);
+    }
   }
 }
 
@@ -110,6 +116,7 @@ export function generateActionTimeout(action: actions.Action): number {
       return 5000;
     case 'expectVisible':
     case 'expectValue':
+    case 'expectList':
       return 1;  // one shot
   }
 }
@@ -127,6 +134,7 @@ export function performActionTimeout(action: actions.Action): number {
       return 0;  // no timeout
     case 'expectVisible':
     case 'expectValue':
+    case 'expectList':
       return 5000;  // default expect timeout.
   }
 }

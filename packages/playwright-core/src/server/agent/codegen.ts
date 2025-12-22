@@ -73,6 +73,10 @@ export async function generateCode(sdkLanguage: Language, action: actions.Action
         return `await expect(page.${locator}).toBeChecked({ checked: ${action.value === 'true'} });`;
       return `await expect(page.${locator}).toHaveValue(${escapeWithQuotes(action.value)});`;
     }
+    case 'expectList': {
+      const locator = asLocator(sdkLanguage, action.selector);
+      return `await expect(page.${locator}).toHaveText(${action.items.map(item => escapeWithQuotes(item)).join(', ')});`;
+    }
   }
   // @ts-expect-error
   throw new Error('Unknown action ' + action.method);

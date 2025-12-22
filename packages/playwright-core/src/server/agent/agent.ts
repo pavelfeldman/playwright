@@ -40,7 +40,17 @@ export async function pagePerform(progress: Progress, page: Page, options: chann
   if (await cachedPerform(progress, context, options))
     return { turns: 0, inputTokens: 0, outputTokens: 0 };
 
-  const { usage } = await perform(progress, context, options.task, undefined, options);
+  const task = `
+### Instructions
+- Perform the following task on the page.
+- Your reply should be a tool call that performs action the page.
+- If you are asked to verify / assert something, don't just examine the snapshot, generate action that verifies / asserts the condition using tool that starts with "browser_expect_".
+
+### Task
+${options.task}
+`;
+
+  const { usage } = await perform(progress, context, task, undefined, options);
   await updateCache(context, options);
   return usage;
 }

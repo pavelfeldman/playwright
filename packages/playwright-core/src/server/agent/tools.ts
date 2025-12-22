@@ -315,6 +315,28 @@ const expectValue = defineTool({
   },
 });
 
+const expectList = defineTool({
+  schema: {
+    name: 'browser_expect_list_visible',
+    title: 'Expect list visible',
+    description: 'Expect list is visible on the page, ensures items is present in the element in the exact order',
+    inputSchema: z.object({
+      element: z.string().describe('Human-readable list description'),
+      ref: z.string().describe('Exact target element reference that points to the list'),
+      items: z.array(z.string()).describe('List items to assert'),
+    }),
+  },
+
+  handle: async (context, params) => {
+    const [selector] = await context.refSelectors([{ ref: params.ref, element: params.element }]);
+    return await context.runActionAndWait({
+      method: 'expectList',
+      selector,
+      items: params.items,
+    });
+  },
+});
+
 export default [
   snapshot,
   click,
@@ -327,4 +349,5 @@ export default [
   expectVisible,
   expectVisibleText,
   expectValue,
+  expectList,
 ] as ToolDefinition<any>[];

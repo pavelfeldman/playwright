@@ -22,6 +22,7 @@ import type { InjectedScript } from './injectedScript';
 import type { Language } from '@isomorphic/locatorGenerators';
 import type { ByRoleOptions } from '@isomorphic/locatorUtils';
 import type { AriaTreeOptions } from './ariaSnapshot';
+import type { GenerateSelectorOptions } from './selectorGenerator';
 
 const selectorSymbol = Symbol('selector');
 
@@ -91,7 +92,7 @@ export class ConsoleAPI {
       $$: (selector: string) => this._querySelectorAll(selector),
       inspect: (selector: string) => this._inspect(selector),
       selector: (element: Element) => this._selector(element),
-      generateLocator: (element: Element, language?: Language) => this._generateLocator(element, language),
+      generateLocator: (element: Element, language?: Language, options?: GenerateSelectorOptions) => this._generateLocator(element, language, options),
       ariaSnapshot: (element?: Element, options?: AriaTreeOptions) => {
         return this._injectedScript.ariaSnapshot(element || this._injectedScript.document.body, options || { mode: 'expect' });
       },
@@ -132,10 +133,10 @@ export class ConsoleAPI {
     return this._injectedScript.generateSelectorSimple(element);
   }
 
-  private _generateLocator(element: Element, language?: Language) {
+  private _generateLocator(element: Element, language?: Language, options?: GenerateSelectorOptions) {
     if (!(element instanceof Element))
       throw new Error(`Usage: playwright.locator(element).`);
-    const selector = this._injectedScript.generateSelectorSimple(element);
+    const selector = this._injectedScript.generateSelectorSimple(element, options);
     return asLocator(language || 'javascript', selector);
   }
 
