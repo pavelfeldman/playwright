@@ -1180,6 +1180,24 @@ export function receivesPointerEvents(element: Element): boolean {
   return result;
 }
 
+export function sharedRole(elements: Element[]): AriaRole | null {
+  const listItemRoles = new Set(elements.map(e => getAriaRole(e)));
+  return listItemRoles.size === 1 ? listItemRoles.values().next().value ?? null : null;
+}
+
+export function sharedNonZeroRole(elements: Element[]): AriaRole | null {
+  let parentElements: Element[] = elements;
+  while (true) {
+    const role = sharedRole(parentElements);
+    if (role)
+      return role;
+    const newParentElements = new Set(parentElements.map(e => e ? parentElementOrShadowHost(e) : undefined));
+    if (newParentElements.size !== elements.length || newParentElements.has(undefined))
+      return null;
+    parentElements = [...newParentElements] as Element[];
+  }
+}
+
 let cacheAccessibleName: Map<Element, string> | undefined;
 let cacheAccessibleNameHidden: Map<Element, string> | undefined;
 let cacheAccessibleDescription: Map<Element, string> | undefined;

@@ -16,6 +16,8 @@
 
 import { parseAriaSnapshot } from '@isomorphic/ariaSnapshot';
 import { asLocator } from '@isomorphic/locatorGenerators';
+import { getByTextSelector } from '@isomorphic/locatorUtils';
+import { MultiMap } from '@isomorphic/multimap';
 import { parseAttributeSelector, parseSelector, stringifySelector, visitAllSelectorParts } from '@isomorphic/selectorParser';
 import { cacheNormalizedWhitespaces, normalizeWhiteSpace, trimStringWithEllipsis } from '@isomorphic/stringUtils';
 
@@ -25,7 +27,7 @@ import { Highlight } from './highlight';
 import { kLayoutSelectorNames, layoutSelectorScore } from './layoutSelectorUtils';
 import { createReactEngine } from './reactSelectorEngine';
 import { createRoleEngine } from './roleSelectorEngine';
-import { beginAriaCaches, endAriaCaches, getAriaDisabled, getAriaRole, getCheckedAllowMixed, getCheckedWithoutMixed, getElementAccessibleDescription, getElementAccessibleErrorMessage, getElementAccessibleName, getReadonly } from './roleUtils';
+import { beginAriaCaches, endAriaCaches, getAriaDisabled, getAriaRole, getCheckedAllowMixed, getCheckedWithoutMixed, getElementAccessibleDescription, getElementAccessibleErrorMessage, getElementAccessibleName, getReadonly, sharedNonZeroRole } from './roleUtils';
 import { SelectorEvaluatorImpl, sortInDOMOrder } from './selectorEvaluator';
 import { generateSelector } from './selectorGenerator';
 import { elementMatchesText, elementText, getElementLabels } from './selectorUtils';
@@ -33,6 +35,7 @@ import { createVueEngine } from './vueSelectorEngine';
 import { XPathEngine } from './xpathSelectorEngine';
 import { ConsoleAPI } from './consoleApi';
 import { UtilityScript } from './utilityScript';
+import { yamlEscapeValueIfNeeded } from './yaml';
 
 import type { AriaTemplateNode } from '@isomorphic/ariaSnapshot';
 import type { CSSComplexSelectorList } from '@isomorphic/cssParser';
@@ -1629,6 +1632,70 @@ export class InjectedScript {
       ++rIndex;
     }
     return mIndex === matchers.length;
+  }
+
+  ariaTemplateForTextList(items: string[]): string | undefined {
+    beginAriaCaches();
+    beginDOMCaches();
+    try {
+      const result = this._findListByTextList(items);
+      if (!result)
+        return undefined;
+      let root = result.root;
+      let listRole = getAriaRole(root);
+      for (let root: Element | undefined = result.root; root; root = parentElementOrShadowHost(root)) {
+        listRole = getAriaRole(root);
+        if (listRole)
+          break;
+      }
+
+      const listItemRole = sharedNonZeroRole(result.elements) ?? 'text';
+      return `- ${listRole}
+  ${result.elements.map(e => `  - ${listItemRole}: ${yamlEscapeValueIfNeeded(e.textContent)}`).join('\n')}`;
+    } finally {
+      endDOMCaches();
+      endAriaCaches();
+    }
+  }
+
+  private _findListByTextList(items: string[]): { root: Element, elements: Element[] } | undefined {
+    const rootsToText = new MultiMap<Element, { element: Element, text: string }>();
+
+    // Find all elements that match the text list, mark all elements on path to text with text.
+    for (const item of items) {
+      const itemSelector = getByTextSelector(item, { exact: true });
+      const parsedSelector = parseSelector(itemSelector);
+      const elements = this.querySelectorAll(parsedSelector, this.document);
+      for (const element of elements) {
+        for (let parent = parentElementOrShadowHost(element); parent; parent = parentElementOrShadowHost(parent))
+          rootsToText.set(parent, { element, text: item });
+      }
+    }
+
+    // Find the root that has all the text items.
+    for (const [root, entries] of rootsToText) {
+      if (items.length !== entries.length)
+        continue;
+      let allMatch = true;
+      for (const item of items) {
+        if (!entries.some(e => e.text === item)) {
+          allMatch = false;
+          break;
+        }
+      }
+      if (allMatch) {
+        // check that elements are in the right order.
+        entries.sort((a, b) => a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+        for (let i = 0; i < items.length; i++) {
+          if (entries[i].text !== items[i])
+            allMatch = false;
+            break;
+        }
+      }
+      if (allMatch)
+        return { root, elements: entries.map(e => e.element) };
+    }
+    return undefined;
   }
 }
 
