@@ -18,6 +18,7 @@ import path from 'path';
 import { assert, createGuid, eventsHelper, RegisteredListener } from '../utils';
 import { debugLogger } from '../utils';
 import { VideoRecorder } from './videoRecorder';
+import { VideoServer } from './videoServer';
 import { Page } from './page';
 import { registry } from './registry';
 import { validateVideoSize } from './browserContext';
@@ -34,6 +35,8 @@ export class Screencast {
   // When throttling for tracing, 200ms between frames, except for 10 frames around the action.
   private _frameThrottler = new FrameThrottler(10, 35, 200);
   private _frameListener: RegisteredListener | null = null;
+
+  private _videoServer: VideoServer | null = null;
 
   constructor(page: Page) {
     this._page = page;
@@ -130,6 +133,30 @@ export class Screencast {
     if (!this._videoId)
       throw new Error('Video is not being recorded');
     await this.stopVideoRecording();
+  }
+
+  async startExplicitVideoServer(options: { size?: types.Size } = {}): Promise<string> {
+    if (this._videoServer)
+      throw new Error('Video server is already running');
+    const size = validateVideoSize(options.size, this._page.emulatedSize()?.viewport);
+    this._videoServer = new VideoServer(this._page);
+    const url = await this._videoServer.start();
+    await this._startScreencast(this._videoServer, {
+      quality: 90,
+      width: size.width,
+      height: size.height,
+    });
+    this._page.once(Page.Events.Close, () => this.stopExplicitVideoServer().catch(() => {}));
+    return url;
+  }
+
+  async stopExplicitVideoServer(): Promise<void> {
+    if (!this._videoServer)
+      throw new Error('Video server is not running');
+    const videoServer = this._videoServer;
+    this._videoServer = null;
+    await this._stopScreencast(videoServer);
+    await videoServer.stop();
   }
 
   private async _setOptions(options: { width: number, height: number, quality: number } | null): Promise<void> {

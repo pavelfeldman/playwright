@@ -36,6 +36,14 @@ export class Video implements api.Video {
     this._artifact = Artifact.from(result.artifact);
   }
 
+  async startServer(options: { size?: { width: number, height: number } } = {}): Promise<{ url: string }> {
+    return await this._page._channel.videoServerStart(options);
+  }
+
+  async stopServer(): Promise<void> {
+    await this._page._channel.videoServerStop();
+  }
+
   async stop(options: { path?: string } = {}): Promise<void> {
     await this._page._wrapApiCall(async () => {
       await this._page._channel.videoStop();

@@ -2043,6 +2043,22 @@ Page:
       title: Stop video recording
       group: configuration
 
+    videoServerStart:
+      title: Start video server
+      group: configuration
+      parameters:
+        size:
+          type: object?
+          properties:
+            width: int
+            height: int
+      returns:
+        url: string
+
+    videoServerStop:
+      title: Stop video server
+      group: configuration
+
     updateSubscription:
       internal: true
       parameters:

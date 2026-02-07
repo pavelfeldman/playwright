@@ -2102,6 +2102,8 @@ export interface PageChannel extends PageEventTarget, EventTargetChannel {
   bringToFront(params?: PageBringToFrontParams, progress?: Progress): Promise<PageBringToFrontResult>;
   videoStart(params: PageVideoStartParams, progress?: Progress): Promise<PageVideoStartResult>;
   videoStop(params?: PageVideoStopParams, progress?: Progress): Promise<PageVideoStopResult>;
+  videoServerStart(params: PageVideoServerStartParams, progress?: Progress): Promise<PageVideoServerStartResult>;
+  videoServerStop(params?: PageVideoServerStopParams, progress?: Progress): Promise<PageVideoServerStopResult>;
   updateSubscription(params: PageUpdateSubscriptionParams, progress?: Progress): Promise<PageUpdateSubscriptionResult>;
   agent(params: PageAgentParams, progress?: Progress): Promise<PageAgentResult>;
 }
@@ -2617,6 +2619,24 @@ export type PageVideoStartResult = {
 export type PageVideoStopParams = {};
 export type PageVideoStopOptions = {};
 export type PageVideoStopResult = void;
+export type PageVideoServerStartParams = {
+  size?: {
+    width: number,
+    height: number,
+  },
+};
+export type PageVideoServerStartOptions = {
+  size?: {
+    width: number,
+    height: number,
+  },
+};
+export type PageVideoServerStartResult = {
+  url: string,
+};
+export type PageVideoServerStopParams = {};
+export type PageVideoServerStopOptions = {};
+export type PageVideoServerStopResult = void;
 export type PageUpdateSubscriptionParams = {
   event: 'console' | 'dialog' | 'fileChooser' | 'request' | 'response' | 'requestFinished' | 'requestFailed',
   enabled: boolean,

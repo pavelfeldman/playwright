@@ -345,6 +345,15 @@ export class PageDispatcher extends Dispatcher<Page, channels.PageChannel, Brows
     await this._page.screencast.stopExplicitVideoRecording();
   }
 
+  async videoServerStart(params: channels.PageVideoServerStartParams, progress: Progress): Promise<channels.PageVideoServerStartResult> {
+    const url = await this._page.screencast.startExplicitVideoServer(params);
+    return { url };
+  }
+
+  async videoServerStop(params: channels.PageVideoServerStopParams, progress: Progress): Promise<channels.PageVideoServerStopResult> {
+    await this._page.screencast.stopExplicitVideoServer();
+  }
+
   async startJSCoverage(params: channels.PageStartJSCoverageParams, progress: Progress): Promise<void> {
     const coverage = this._page.coverage as CRCoverage;
     await coverage.startJSCoverage(progress, params);

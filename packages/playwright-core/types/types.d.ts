@@ -21911,6 +21911,44 @@ export interface Video {
   }): Promise<void>;
 
   /**
+   * Starts an HTTP server that streams live screencast frames over WebSocket. Returns an object with the server URL.
+   * Open the URL in a browser to see the live screencast.
+   *
+   * **Usage**
+   *
+   * ```js
+   * const { url } = await page.video().startServer();
+   * console.log('Open to view screencast:', url);
+   * // ... perform actions ...
+   * await page.video().stopServer();
+   * ```
+   *
+   * @param options
+   */
+  startServer(options?: {
+    /**
+     * Optional dimensions of the screencast frames. If not specified the size will be equal to page viewport scaled down
+     * to fit into 800x800.
+     */
+    size?: {
+      /**
+       * Video frame width.
+       */
+      width: number;
+
+      /**
+       * Video frame height.
+       */
+      height: number;
+    };
+  }): Promise<{
+    /**
+     * URL of the screencast server.
+     */
+    url: string;
+  }>;
+
+  /**
    * Stops video recording started with
    * [video.start([options])](https://playwright.dev/docs/api/class-video#video-start).
    * @param options
@@ -21921,6 +21959,12 @@ export interface Video {
      */
     path?: string;
   }): Promise<void>;
+
+  /**
+   * Stops the screencast server started with
+   * [video.startServer([options])](https://playwright.dev/docs/api/class-video#video-start-server).
+   */
+  stopServer(): Promise<void>;
 }
 
 /**

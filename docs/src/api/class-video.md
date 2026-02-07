@@ -92,6 +92,38 @@ Saves the video to a user-specified path. If using the sync API, this must be ca
 Path where the video should be saved.
 
 
+## async method: Video.startServer
+* since: v1.59
+* langs: js
+- returns: <[Object]>
+  - `url` <[string]> URL of the screencast server.
+
+Starts an HTTP server that streams live screencast frames over WebSocket. Returns an object with the server URL.
+Open the URL in a browser to see the live screencast.
+
+**Usage**
+
+```js
+const { url } = await page.video().startServer();
+console.log('Open to view screencast:', url);
+// ... perform actions ...
+await page.video().stopServer();
+```
+
+### option: Video.startServer.size
+* since: v1.59
+- `size` ?<[Object]>
+  - `width` <[int]> Video frame width.
+  - `height` <[int]> Video frame height.
+
+Optional dimensions of the screencast frames. If not specified the size will be equal to page viewport scaled down to fit into 800x800.
+
+## async method: Video.stopServer
+* since: v1.59
+* langs: js
+
+Stops the screencast server started with [`method: Video.startServer`].
+
 ## async method: Video.start
 * since: v1.59
 

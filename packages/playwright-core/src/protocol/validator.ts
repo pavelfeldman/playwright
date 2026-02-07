@@ -1511,6 +1511,17 @@ scheme.PageVideoStartResult = tObject({
 });
 scheme.PageVideoStopParams = tOptional(tObject({}));
 scheme.PageVideoStopResult = tOptional(tObject({}));
+scheme.PageVideoServerStartParams = tObject({
+  size: tOptional(tObject({
+    width: tInt,
+    height: tInt,
+  })),
+});
+scheme.PageVideoServerStartResult = tObject({
+  url: tString,
+});
+scheme.PageVideoServerStopParams = tOptional(tObject({}));
+scheme.PageVideoServerStopResult = tOptional(tObject({}));
 scheme.PageUpdateSubscriptionParams = tObject({
   event: tEnum(['console', 'dialog', 'fileChooser', 'request', 'response', 'requestFinished', 'requestFailed']),
   enabled: tBoolean,
