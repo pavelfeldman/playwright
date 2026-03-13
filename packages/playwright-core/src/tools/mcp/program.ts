@@ -23,6 +23,7 @@ import { createBrowser } from './browserFactory';
 import { BrowserBackend } from '../backend/browserBackend';
 import { filteredTools } from '../backend/tools';
 import { testDebug } from './log';
+import { program as mainProgram } from '../../cli/program';
 
 import type { Command } from '../../utilsBundle';
 import type { ClientInfo } from '../utils/mcp/server';
@@ -153,8 +154,7 @@ export function decorateMCPInstallBrowserCommand(command: Command) {
       .option('--only-shell', 'only install headless shell when installing chromium')
       .option('--no-shell', 'do not install chromium headless shell')
       .action(async options => {
-        const { program } = require('../program');
         const argv = process.argv.map(arg => arg === 'install-browser' ? 'install' : arg);
-        program.parse(argv);
+        mainProgram.parse(argv);
       });
 }
