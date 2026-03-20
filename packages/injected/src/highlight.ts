@@ -50,6 +50,7 @@ export class Highlight {
   private _glassPaneShadow: ShadowRoot;
   private _renderedEntries: RenderedHighlightEntry[] = [];
   private _actionPointElement: HTMLElement;
+  private _subtitleElement: HTMLElement;
   private _isUnderTest: boolean;
   private _injectedScript: InjectedScript;
   private _rafRequest: number | undefined;
@@ -75,6 +76,8 @@ export class Highlight {
     this._glassPaneElement.style.backgroundColor = 'transparent';
     this._actionPointElement = document.createElement('x-pw-action-point');
     this._actionPointElement.setAttribute('hidden', 'true');
+    this._subtitleElement = document.createElement('x-pw-subtitle');
+    this._subtitleElement.setAttribute('hidden', 'true');
     this._glassPaneShadow = this._glassPaneElement.attachShadow({ mode: this._isUnderTest ? 'open' : 'closed' });
     // workaround for firefox: when taking screenshots, it complains adoptedStyleSheets.push
     // is not a function, so we fallback to style injection
@@ -88,6 +91,7 @@ export class Highlight {
       this._glassPaneShadow.appendChild(styleElement);
     }
     this._glassPaneShadow.appendChild(this._actionPointElement);
+    this._glassPaneShadow.appendChild(this._subtitleElement);
   }
 
   install() {
@@ -139,6 +143,16 @@ export class Highlight {
 
   hideActionPoint() {
     this._actionPointElement.hidden = true;
+  }
+
+  showSubtitle(text: string, fadeDuration: number) {
+    this._subtitleElement.textContent = text;
+    this._subtitleElement.hidden = false;
+    this._subtitleElement.style.animation = `pw-fade-out ${fadeDuration}ms ease-out forwards`;
+  }
+
+  hideSubtitle() {
+    this._subtitleElement.hidden = true;
   }
 
   clearHighlight() {

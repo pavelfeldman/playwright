@@ -17,7 +17,7 @@
 import fs from 'fs';
 
 import * as js from './javascript';
-import { isUnderTest } from '../utils';
+import { isUnderTest, renderTitleForCall } from '../utils';
 import { prepareFilesForUpload } from './fileUploadUtils';
 import * as rawInjectedScriptSource from '../generated/injectedScriptSource';
 
@@ -377,15 +377,24 @@ export class ElementHandle<T extends Node = Node> extends js.JSHandle<T> {
     }, { ...options, skipActionPreChecks });
   }
 
-  private async _beforeAction(progress: Progress, point?: types.Point): Promise<void> {
+  private async _beforeInputAction(progress: Progress, point?: types.Point): Promise<void> {
     await progress.race(this.instrumentation.onBeforeInputAction(this, progress.metadata));
     const annotate = progress.metadata.annotate;
     if (annotate) {
-      await progress.race(this.evaluateInUtility(async ([injected, node, options]) => {
-        injected.highlightNode(node, options.point, options.delay);
-        await new Promise(f => injected.utils.builtins.setTimeout(f, options.delay));
+      const title = renderTitleForCall(progress.metadata);
+      const utility = await this._frame._utilityContext();
+      await progress.race(utility.evaluate(async options => {
+        const { injected, delay } = options;
+        injected.annotate(options);
+        await new Promise(f => injected.utils.builtins.setTimeout(f, delay));
         injected.hideHighlight();
-      }, { point, delay: annotate.delay }));
+      }, {
+        injected: await utility.injectedScript(),
+        ...annotate,
+        point,
+        title,
+        node: this
+      }));
     }
   }
 
@@ -445,7 +454,7 @@ export class ElementHandle<T extends Node = Node> extends js.JSHandle<T> {
       return maybePoint;
     const point = roundPoint(maybePoint);
     progress.metadata.point = point;
-    await this._beforeAction(progress, point);
+    await this._beforeInputAction(progress, point);
 
     let hitTargetInterceptionHandle: js.JSHandle<HitTargetInterceptionResult> | undefined;
     if (force) {
@@ -570,7 +579,7 @@ export class ElementHandle<T extends Node = Node> extends js.JSHandle<T> {
   async _selectOption(progress: Progress, elements: ElementHandle[], values: types.SelectOption[], options: types.CommonActionOptions): Promise<string[] | 'error:notconnected'> {
     let resultingOptions: string[] = [];
     const result = await this._retryAction(progress, 'select option', async () => {
-      await this._beforeAction(progress);
+      await this._beforeInputAction(progress);
       if (!options.force)
         progress.log(`  waiting for element to be visible and enabled`);
       const optionsToSelect = [...elements, ...values];
@@ -603,7 +612,7 @@ export class ElementHandle<T extends Node = Node> extends js.JSHandle<T> {
   async _fill(progress: Progress, value: string, options: types.CommonActionOptions): Promise<'error:notconnected' | 'done'> {
     progress.log(`  fill("${value}")`);
     return await this._retryAction(progress, 'fill', async () => {
-      await this._beforeAction(progress);
+      await this._beforeInputAction(progress);
       if (!options.force)
         progress.log('  waiting for element to be visible, enabled and editable');
       const result = await progress.race(this.evaluateInUtility(async ([injected, node, { value, force }]) => {
@@ -670,7 +679,7 @@ export class ElementHandle<T extends Node = Node> extends js.JSHandle<T> {
     if (result === 'error:notconnected' || !result.asElement())
       return 'error:notconnected';
     const retargeted = result.asElement() as ElementHandle<HTMLInputElement>;
-    await this._beforeAction(progress);
+    await this._beforeInputAction(progress);
     if (localPaths || localDirectory) {
       const localPathsOrDirectory = localDirectory ? [localDirectory] : localPaths!;
       await progress.race(Promise.all((localPathsOrDirectory).map(localPath => (
@@ -711,7 +720,7 @@ export class ElementHandle<T extends Node = Node> extends js.JSHandle<T> {
 
   async _type(progress: Progress, text: string, options: { delay?: number } & types.StrictOptions): Promise<'error:notconnected' | 'done'> {
     progress.log(`elementHandle.type("${text}")`);
-    await this._beforeAction(progress);
+    await this._beforeInputAction(progress);
     const result = await this._focus(progress, true /* resetSelectionIfNotFocused */);
     if (result !== 'done')
       return result;
@@ -727,7 +736,7 @@ export class ElementHandle<T extends Node = Node> extends js.JSHandle<T> {
 
   async _press(progress: Progress, key: string, options: { delay?: number, noWaitAfter?: boolean } & types.StrictOptions): Promise<'error:notconnected' | 'done'> {
     progress.log(`elementHandle.press("${key}")`);
-    await this._beforeAction(progress);
+    await this._beforeInputAction(progress);
     return this._page.frameManager.waitForSignalsCreatedBy(progress, !options.noWaitAfter, async () => {
       const result = await this._focus(progress, true /* resetSelectionIfNotFocused */);
       if (result !== 'done')
