@@ -20,7 +20,7 @@ import { navigate } from './index';
 import { DashboardClient } from './dashboardClient';
 import { asLocator } from '@isomorphic/locatorGenerators';
 import { SplitView } from '@web/components/splitView';
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, PlusIcon, ReloadIcon, PickLocatorIcon, InspectorPanelIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, PlusIcon, ReloadIcon, PickLocatorIcon } from './icons';
 import { SettingsButton } from './settingsView';
 
 import type { DashboardClientChannel } from './dashboardClient';
@@ -43,7 +43,6 @@ export const Dashboard: React.FC<{ wsUrl?: string }> = ({ wsUrl }) => {
   const [tabs, setTabs] = React.useState<Tab[] | null>(null);
   const [url, setUrl] = React.useState('');
   const [frame, setFrame] = React.useState<DashboardChannelEvents['frame']>();
-  const [showInspector, setShowInspector] = React.useState(false);
   const [pickingTabId, setPickingTabId] = React.useState<string | null>(null);
   const [locatorToast, setLocatorToast] = React.useState<{ text: string; timer: ReturnType<typeof setTimeout> }>();
 
@@ -103,7 +102,6 @@ export const Dashboard: React.FC<{ wsUrl?: string }> = ({ wsUrl }) => {
       setChannel(undefined);
       setInteractive(false);
       setPickingTabId(null);
-      setShowInspector(false);
     };
 
     return () => {
@@ -272,7 +270,6 @@ export const Dashboard: React.FC<{ wsUrl?: string }> = ({ wsUrl }) => {
             onClick={() => {
               channel?.cancelPickLocator();
               setPickingTabId(null);
-              setShowInspector(false);
               setInteractive(false);
             }}
           >
@@ -334,20 +331,6 @@ export const Dashboard: React.FC<{ wsUrl?: string }> = ({ wsUrl }) => {
       >
         <PickLocatorIcon />
       </button>
-      {selectedTab?.inspectorUrl && (
-        <button
-          className={'nav-btn' + (showInspector ? ' active-toggle' : '')}
-          title='Chrome DevTools'
-          aria-pressed={showInspector}
-          disabled={!channel}
-          onClick={() => {
-            setInteractive(true);
-            setShowInspector(!showInspector);
-          }}
-        >
-          <InspectorPanelIcon />
-        </button>
-      )}
     </div>
 
     {/* Viewport */}
@@ -357,7 +340,7 @@ export const Dashboard: React.FC<{ wsUrl?: string }> = ({ wsUrl }) => {
         sidebarSize={500}
         minSidebarSize={300}
         settingName='devtoolsInspector'
-        sidebarHidden={!showInspector || !selectedTab?.inspectorUrl}
+        sidebarHidden={true}
         main={<div className='viewport-main'>
           <div
             ref={screenRef}
@@ -388,11 +371,7 @@ export const Dashboard: React.FC<{ wsUrl?: string }> = ({ wsUrl }) => {
           </div>
           {overlayText && <div className={'screen-overlay' + (frame ? ' has-frame' : '')}><span>{overlayText}</span></div>}
         </div>}
-        sidebar={<iframe
-          className='inspector-frame'
-          src={selectedTab?.inspectorUrl || ''}
-          title='Chrome DevTools'
-        />}
+        sidebar={<div />}
       />
     </div>
   </div>);
