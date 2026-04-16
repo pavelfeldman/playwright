@@ -76,6 +76,21 @@ test('should show current workspace sessions first', async ({ cli, server, openD
   });
 });
 
+test('should show cwd for sessions without a workspace marker', async ({ cli, server, openDashboard }) => {
+  const cwd = await fs.promises.realpath(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'pw-no-ws-')));
+  try {
+    await cli('open', server.EMPTY_PAGE, { cwd });
+
+    const dashboard = await openDashboard({ cwd });
+    const workspaceGroups = dashboard.locator('.workspace-group');
+    await expect(workspaceGroups).toHaveCount(1);
+    await expect(workspaceGroups.locator('.workspace-path-full')).toHaveText(displayPath(cwd));
+    await expect(workspaceGroups.locator('.session-chip')).toHaveCount(1);
+  } finally {
+    await fs.promises.rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test('should pick locator from browser', async ({ cli, server, openDashboard }) => {
   server.setContent('/', '<button style="position:fixed;inset:0;width:100vw;height:100vh">Submit</button>', 'text/html');
 
