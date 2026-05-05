@@ -104,10 +104,12 @@ function validateBearerToken(req: http.IncomingMessage, res: http.ServerResponse
 
   const presented = Buffer.from(match[1], 'utf8');
   const expected = Buffer.from(expectedToken, 'utf8');
-  // Constant-time comparison; length-mismatched buffers are not equal but we still compare to
-  // avoid leaking length via timing.
+  // Always run timingSafeEqual on equal-length buffers — even when the presented token has the
+  // wrong length — so the response time does not leak the token length. timingSafeEqual itself
+  // requires equal-length inputs, so for a length mismatch we feed it a zeroed dummy buffer.
   const padded = presented.length === expected.length ? presented : Buffer.alloc(expected.length);
-  if (presented.length !== expected.length || !crypto.timingSafeEqual(padded, expected)) {
+  const valuesEqual = crypto.timingSafeEqual(padded, expected);
+  if (presented.length !== expected.length || !valuesEqual) {
     sendAuthChallenge(res, { code: 'invalid_token', description: 'token is invalid or expired' });
     return false;
   }
