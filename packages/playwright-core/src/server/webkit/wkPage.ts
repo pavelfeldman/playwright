@@ -134,13 +134,34 @@ export class WKPage implements PageDelegate {
     await Promise.all(promises);
   }
 
-  private _setSession(session: WKSession) {
+  _setSession(session: WKSession) {
     eventsHelper.removeEventListeners(this._sessionListeners);
     this._session = session;
     this.rawKeyboard.setSession(session);
     this.rawMouse.setSession(session);
     this._addSessionListeners();
     this._workers.setSession(session);
+  }
+
+  async _initializeForRemoteDebugging(session: WKSession): Promise<void> {
+    this._setSession(session);
+    let pageOrError: Page | Error;
+    try {
+      const [, frameTree] = await Promise.all([
+        session.send('Page.enable'),
+        session.send('Page.getResourceTree'),
+      ] as const);
+      this._handleFrameTree(frameTree.frameTree);
+      await Promise.all([
+        session.send('Runtime.enable'),
+        session.sendMayFail('Network.enable'),
+        session.sendMayFail('Console.enable'),
+      ]);
+      pageOrError = this._page;
+    } catch (e) {
+      pageOrError = e as Error;
+    }
+    await this._page.reportAsNew(undefined, pageOrError instanceof Page ? undefined : pageOrError);
   }
 
   // This method is called for provisional targets as well. The session passed as the parameter

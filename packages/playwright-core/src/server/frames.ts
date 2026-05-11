@@ -751,7 +751,8 @@ export class Frame extends SdkObject<FrameEventMap> {
   }
 
   utilityContext(): Promise<dom.FrameExecutionContext> {
-    return this.context('utility');
+    // return this.context('utility');
+    return this.context('main');
   }
 
   async evaluateExpression(progress: Progress, expression: string, options: { isFunction?: boolean, world?: types.World } = {}, arg?: any): Promise<any> {

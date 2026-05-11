@@ -15,18 +15,31 @@
  * limitations under the License.
  */
 
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import { wrapInASCIIBox } from '@utils/ascii';
+import { RecentLogsCollector } from '@utils/debugLogger';
+import { removeFolders } from '@utils/fileUtils';
 import { spawnAsync } from '@utils/spawnAsync';
+import { headersArrayToObject } from '@isomorphic/headers';
 import { kBrowserCloseMessageId } from './wkConnection';
+import { Browser } from '../browser';
+import { validateBrowserContextOptions } from '../browserContext';
 import { BrowserType, kNoXServerRunningError } from '../browserType';
+import { helper } from '../helper';
+import { WebSocketTransport } from '../transport';
+import { getUserAgent } from '../userAgent';
 import { WKBrowser } from '../webkit/wkBrowser';
 
-import type { BrowserOptions } from '../browser';
+import type { BrowserOptions, BrowserProcess } from '../browser';
 import type { SdkObject } from '../instrumentation';
+import type { Progress } from '../progress';
 import type { ConnectionTransport } from '../transport';
 import type * as types from '../types';
+
+const ARTIFACTS_FOLDER = path.join(os.tmpdir(), 'playwright-artifacts-');
 
 export class WebKit extends BrowserType {
   constructor(parent: SdkObject) {
@@ -35,6 +48,59 @@ export class WebKit extends BrowserType {
 
   override connectToTransport(transport: ConnectionTransport, options: BrowserOptions): Promise<WKBrowser> {
     return WKBrowser.connect(this.attribution.playwright, transport, options);
+  }
+
+  override async connectOverCDP(progress: Progress, endpointURL: string, options: { slowMo?: number, headers?: types.HeadersArray, isLocal?: boolean, noDefaults?: boolean }): Promise<Browser> {
+    let headersMap: { [key: string]: string; } | undefined;
+    if (options.headers)
+      headersMap = headersArrayToObject(options.headers, false);
+    if (!headersMap)
+      headersMap = { 'User-Agent': getUserAgent() };
+    else if (!Object.keys(headersMap).some(key => key.toLowerCase() === 'user-agent'))
+      headersMap['User-Agent'] = getUserAgent();
+
+    const transport = await WebSocketTransport.connect(progress, endpointURL, { headers: headersMap, followRedirects: true });
+    const closeAndWait = async () => await transport.closeAndWait();
+
+    const artifactsDir = await progress.race(fs.promises.mkdtemp(ARTIFACTS_FOLDER));
+    const doCleanup = async () => {
+      await removeFolders([artifactsDir]);
+    };
+    const doClose = async () => {
+      await closeAndWait();
+      await doCleanup();
+    };
+
+    try {
+      const browserProcess: BrowserProcess = { close: doClose, kill: doClose };
+      const persistent: types.BrowserContextOptions = {
+        noDefaultViewport: true,
+        ...(options.noDefaults ? { acceptDownloads: 'internal-browser-default' as const } : {}),
+      };
+      const browserOptions: BrowserOptions = {
+        slowMo: options.slowMo,
+        name: 'webkit',
+        browserType: 'webkit',
+        persistent,
+        browserProcess,
+        protocolLogger: helper.debugProtocolLogger(),
+        browserLogsCollector: new RecentLogsCollector(),
+        artifactsDir,
+        downloadsPath: artifactsDir,
+        tracesDir: artifactsDir,
+        originalLaunchOptions: {},
+        noDefaults: options.noDefaults,
+      };
+      validateBrowserContextOptions(persistent, browserOptions);
+      const browser = await progress.race(WKBrowser.connectOverCDP(this.attribution.playwright, transport, browserOptions));
+      if (!options.isLocal)
+        browser._isCollocatedWithServer = false;
+      browser.on(Browser.Events.Disconnected, doCleanup);
+      return browser;
+    } catch (error) {
+      await progress.race(doClose().catch(() => {}));
+      throw error;
+    }
   }
 
   override amendEnvironment(env: NodeJS.ProcessEnv, userDataDir: string, isPersistent: boolean, options: types.LaunchOptions): NodeJS.ProcessEnv {

@@ -36,10 +36,11 @@ const BROWSER_VERSION = '26.4';
 const DEFAULT_USER_AGENT = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${BROWSER_VERSION} Safari/605.1.15`;
 
 export class WKBrowser extends Browser {
-  private readonly _connection: WKConnection;
+  readonly _connection: WKConnection;
   readonly _browserSession: WKSession;
   readonly _contexts = new Map<string, WKBrowserContext>();
   readonly _wkPages = new Map<string, WKPage>();
+  _rdpMode = false;
 
   static async connect(parent: SdkObject, transport: ConnectionTransport, options: BrowserOptions): Promise<WKBrowser> {
     const browser = new WKBrowser(parent, transport, options);
@@ -54,6 +55,26 @@ export class WKBrowser extends Browser {
       promises.push(browser._defaultContext.initialize());
     }
     await Promise.all(promises);
+    return browser;
+  }
+
+  static async connectOverCDP(parent: SdkObject, transport: ConnectionTransport, options: BrowserOptions): Promise<WKBrowser> {
+    const browser = new WKBrowser(parent, transport, options);
+    browser._rdpMode = true;
+
+    options.persistent!.userAgent ||= DEFAULT_USER_AGENT;
+    const context = new WKBrowserContext(browser, undefined, options.persistent!);
+    browser._defaultContext = context;
+    await context.initialize();
+
+    const mockPageProxySession = new WKSession(browser._connection, '', message => {
+      Promise.resolve().then(() => mockPageProxySession.dispatchMessage({ id: message.id, result: {} }));
+    });
+
+    const wkPage = new WKPage(context, mockPageProxySession, null);
+    browser._wkPages.set('__rdp_page__', wkPage);
+
+    await wkPage._initializeForRemoteDebugging(browser._browserSession);
     return browser;
   }
 
@@ -215,6 +236,10 @@ export class WKBrowserContext extends BrowserContext {
 
   override async initialize() {
     assert(!this._wkPages().length);
+    if (this._browser._rdpMode) {
+      await super.initialize();
+      return;
+    }
     const browserContextId = this._browserContextId;
     const promises: Promise<any>[] = [super.initialize()];
     promises.push(this._browser._browserSession.send('Playwright.setDownloadBehavior', {
