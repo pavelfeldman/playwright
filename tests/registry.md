@@ -361,6 +361,7 @@ subsystem, add a row to the Subsystems table. Then update this file:
 | `AU-022` | `library/browsercontext-webauthn.spec.ts` | should reject invalid signCount |
 | `AU-023` | `library/browsercontext-webauthn.spec.ts` | should preserve signCount via the storageState option |
 | `AU-024` | `library/browsercontext-webauthn.spec.ts` | should serialize credentials with toJSON |
+| `AU-025` | `library/browsercontext-webauthn.spec.ts` | should evaluate the prf extension |
 
 ### AW — Auto-waiting
 

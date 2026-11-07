@@ -35,6 +35,8 @@ export type VirtualCredential = {
   signCount: number;
 };
 
+type PrfValues = { first: string, second?: string };  // base64url
+
 type CredentialRecord = VirtualCredential & {
   isResident: boolean;
 };
@@ -173,6 +175,7 @@ export class Credentials {
     const attestedCredentialData = Buffer.concat([kAuthenticatorAAGUID, credIdLenBuf, credentialId, cosePublicKey]);
     const authData = Buffer.concat([rpIdHash, Buffer.from([flags]), signCountBuf, attestedCredentialData]);
     const attestationObject = encodeAttestationObjectNone(authData);
+    const prf = req.prf ? { enabled: true, ...(req.prf.eval ? { results: evaluatePrf(pair.privateKey, req.prf.eval) } : {}) } : undefined;
     return {
       ok: true,
       id: credentialIdB64,
@@ -180,6 +183,7 @@ export class Credentials {
       attestationObject: bufToB64Url(attestationObject),
       authenticatorData: bufToB64Url(authData),
       publicKey,
+      prf,
     };
   }
 
@@ -221,6 +225,8 @@ export class Credentials {
     const toSign = Buffer.concat([authData, clientDataHash]);
     const privateKey = crypto.createPrivateKey({ key: b64UrlToBuf(candidate.privateKey), format: 'der', type: 'pkcs8' });
     const signature = crypto.sign('sha256', toSign, privateKey);
+    const prfInputs: PrfValues | undefined = req.prf?.evalByCredential?.[candidate.id] || req.prf?.eval;
+    const prf = prfInputs ? { results: evaluatePrf(privateKey, prfInputs) } : undefined;
     return {
       ok: true,
       id: candidate.id,
@@ -228,12 +234,26 @@ export class Credentials {
       authenticatorData: bufToB64Url(authData),
       signature: bufToB64Url(signature),
       userHandle: candidate.userHandle || null,
+      prf,
     };
   }
 }
 
 function toPublic(r: CredentialRecord): VirtualCredential {
   return { id: r.id, rpId: r.rpId, userHandle: r.userHandle, privateKey: r.privateKey, publicKey: r.publicKey, signCount: r.signCount };
+}
+
+// https://w3c.github.io/webauthn/#prf-extension: each input is hashed with a fixed prefix,
+// then run through the CTAP2 hmac-secret function. The hmac-secret key is derived from the
+// private key, so a captured and re-seeded credential produces the same outputs.
+function evaluatePrf(privateKey: crypto.KeyObject, inputs: PrfValues): PrfValues {
+  const { d } = privateKey.export({ format: 'jwk' }) as { d: string };
+  const hmacKey = Buffer.from(crypto.hkdfSync('sha256', Buffer.from(d, 'base64url'), '', 'Playwright WebAuthn PRF', 32));
+  const evaluate = (input: string) => {
+    const salt = crypto.createHash('sha256').update('WebAuthn PRF').update(Buffer.from([0])).update(b64UrlToBuf(input)).digest();
+    return bufToB64Url(crypto.createHmac('sha256', hmacKey).update(salt).digest());
+  };
+  return { first: evaluate(inputs.first), ...(inputs.second !== undefined ? { second: evaluate(inputs.second) } : {}) };
 }
 
 function randomBase64Url(bytes: number): string {

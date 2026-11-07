@@ -15,6 +15,8 @@
  */
 
 // Wire format passed through the page binding (JSON-only; binary is base64url).
+export type PrfValues = { first: string, second?: string };
+
 export type CreateRequest = {
   type: 'create',
   origin: string,
@@ -25,6 +27,7 @@ export type CreateRequest = {
   excludeCredentials?: { type: string, id: string }[],
   userVerification?: string,
   residentKey?: string,
+  prf?: { eval?: PrfValues },
 };
 
 export type GetRequest = {
@@ -34,6 +37,11 @@ export type GetRequest = {
   rpId: string,
   allowCredentials?: { type: string, id: string }[],
   userVerification?: string,
+  prf?: { eval?: PrfValues, evalByCredential?: Record<string, PrfValues> },
+};
+
+export type ClientExtensionResults = {
+  prf?: { enabled?: boolean, results?: PrfValues },
 };
 
 export type CreateResponse = {
@@ -43,6 +51,7 @@ export type CreateResponse = {
   attestationObject: string,
   authenticatorData: string,
   publicKey: string,
+  prf?: { enabled: boolean, results?: PrfValues },
 } | { ok: false, name: string, message: string };
 
 export type GetResponse = {
@@ -52,6 +61,7 @@ export type GetResponse = {
   authenticatorData: string,
   signature: string,
   userHandle: string | null,
+  prf?: { results: PrfValues },
 } | { ok: false, name: string, message: string };
 
 type GlobalThis = typeof globalThis;
@@ -118,7 +128,7 @@ export function inject(globalThis: GlobalThis) {
     return r;
   }
 
-  function makePublicKeyCredential(id: string, response: any, responseToJSON: () => Record<string, any>) {
+  function makePublicKeyCredential(id: string, response: any, responseToJSON: () => Record<string, any>, extensionResults: ClientExtensionResults) {
     const proto = PublicKeyCredentialCtor?.prototype || Object.prototype;
     const cred = Object.create(proto);
     defineReadonly(cred, {
@@ -128,17 +138,35 @@ export function inject(globalThis: GlobalThis) {
       authenticatorAttachment: 'platform',
       response,
     });
-    cred.getClientExtensionResults = () => ({});
+    cred.getClientExtensionResults = () => {
+      const results: Record<string, any> = {};
+      if (extensionResults.prf) {
+        results.prf = { ...extensionResults.prf };
+        if (extensionResults.prf.results)
+          results.prf.results = fromBase64UrlValues(extensionResults.prf.results);
+      }
+      return results;
+    };
     // https://w3c.github.io/webauthn/#dom-publickeycredential-tojson
     cred.toJSON = () => ({
       id,
       rawId: id,
       response: responseToJSON(),
       authenticatorAttachment: 'platform',
-      clientExtensionResults: {},
+      clientExtensionResults: extensionResults,
       type: 'public-key',
     });
     return cred;
+  }
+
+  function toBase64UrlValues(values: any): PrfValues | undefined {
+    if (!values || values.first === undefined)
+      return undefined;
+    return { first: toBase64Url(toBuf(values.first)), ...(values.second !== undefined ? { second: toBase64Url(toBuf(values.second)) } : {}) };
+  }
+
+  function fromBase64UrlValues(values: PrfValues) {
+    return { first: fromBase64Url(values.first), ...(values.second !== undefined ? { second: fromBase64Url(values.second) } : {}) };
   }
 
   function toBuf(x: ArrayBuffer | ArrayBufferView | undefined): ArrayBuffer {
@@ -179,6 +207,8 @@ export function inject(globalThis: GlobalThis) {
       userVerification: pk.authenticatorSelection?.userVerification,
       residentKey: pk.authenticatorSelection?.residentKey,
     };
+    if (pk.extensions?.prf)
+      req.prf = { eval: toBase64UrlValues(pk.extensions.prf.eval) };
     const result: CreateResponse = await binding(req);
     if (!result.ok)
       failure(result.name, result.message);
@@ -195,7 +225,7 @@ export function inject(globalThis: GlobalThis) {
       publicKey: result.publicKey,
       publicKeyAlgorithm: resp.getPublicKeyAlgorithm(),
       attestationObject: result.attestationObject,
-    }));
+    }), result.prf ? { prf: result.prf } : {});
   };
 
   globalThis.navigator.credentials.get = async function(options?: CredentialRequestOptions): Promise<Credential | null> {
@@ -210,6 +240,15 @@ export function inject(globalThis: GlobalThis) {
       allowCredentials: (pk.allowCredentials || []).map((c: any) => ({ type: c.type, id: toBase64Url(toBuf(c.id)) })),
       userVerification: pk.userVerification,
     };
+    if (pk.extensions?.prf) {
+      const evalByCredential: Record<string, PrfValues> = {};
+      for (const [credentialId, values] of Object.entries(pk.extensions.prf.evalByCredential || {})) {
+        const prfValues = toBase64UrlValues(values);
+        if (prfValues)
+          evalByCredential[credentialId] = prfValues;
+      }
+      req.prf = { eval: toBase64UrlValues(pk.extensions.prf.eval), evalByCredential };
+    }
     const result: GetResponse = await binding(req);
     if (!result.ok)
       failure(result.name, result.message);
@@ -224,7 +263,7 @@ export function inject(globalThis: GlobalThis) {
       authenticatorData: result.authenticatorData,
       signature: result.signature,
       ...(result.userHandle ? { userHandle: result.userHandle } : {}),
-    }));
+    }), result.prf ? { prf: result.prf } : {});
   };
 
   if (PublicKeyCredentialCtor) {

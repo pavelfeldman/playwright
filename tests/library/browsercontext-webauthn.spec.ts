@@ -351,3 +351,82 @@ it('AU-024 should serialize credentials with toJSON', {
   expect(Buffer.from(registration.response.attestationObject, 'base64url').includes(authData)).toBe(true);
   expect(authData[32] & 0x40).toBe(0x40);
 });
+
+it('AU-025 should evaluate the prf extension', {
+  annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright/issues/43921' },
+}, async ({ contextFactory, server }) => {
+  // Setup context: the app registers a passkey and evaluates the PRF during registration.
+  const setupContext = await contextFactory();
+  await setupContext.credentials.install();
+  const setupPage = await setupContext.newPage();
+  await setupPage.goto(server.EMPTY_PAGE);
+
+  const registration = await setupPage.evaluate(async ({ rpId }) => {
+    const toB64Url = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const created = await navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { id: rpId, name: 'Test RP' },
+        user: { id: new Uint8Array([1, 2, 3, 4]), name: 'u', displayName: 'User' },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+        authenticatorSelection: { residentKey: 'required' },
+        extensions: { prf: { eval: { first: new TextEncoder().encode('salt-1'), second: new TextEncoder().encode('salt-2') } } },
+      },
+    }) as PublicKeyCredential;
+    const { prf } = created.getClientExtensionResults();
+    return {
+      id: created.id,
+      enabled: prf!.enabled,
+      first: toB64Url(prf!.results!.first as ArrayBuffer),
+      second: toB64Url(prf!.results!.second as ArrayBuffer),
+      json: JSON.parse(JSON.stringify(created)).clientExtensionResults,
+    };
+  }, { rpId: server.HOSTNAME });
+
+  expect(registration.enabled).toBe(true);
+  expect(Buffer.from(registration.first, 'base64url')).toHaveLength(32);
+  expect(registration.second).not.toBe(registration.first);
+  expect(registration.json).toEqual({ prf: { enabled: true, results: { first: registration.first, second: registration.second } } });
+
+  // Reuse the captured passkey in a fresh context: the same inputs produce the same outputs.
+  const [captured] = await setupContext.credentials.get({ rpId: server.HOSTNAME });
+  const context = await contextFactory();
+  await context.credentials.create(captured.rpId, captured);
+  await context.credentials.install();
+  const page = await context.newPage();
+  await page.goto(server.EMPTY_PAGE);
+
+  const authentication = await page.evaluate(async ({ rpId, credentialId }) => {
+    const toB64Url = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const b64UrlToBytes = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const evaluate = async (options: AuthenticationExtensionsPRFInputs) => {
+      const cred = await navigator.credentials.get({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          rpId,
+          allowCredentials: [{ type: 'public-key', id: b64UrlToBytes(credentialId) }],
+          extensions: { prf: options },
+        },
+      }) as PublicKeyCredential;
+      const { prf } = cred.getClientExtensionResults();
+      return { first: toB64Url(prf!.results!.first as ArrayBuffer), second: prf!.results!.second ? toB64Url(prf!.results!.second as ArrayBuffer) : undefined, json: JSON.parse(JSON.stringify(cred)).clientExtensionResults };
+    };
+    return {
+      byEval: await evaluate({ eval: { first: new TextEncoder().encode('salt-1') } }),
+      byCredential: await evaluate({ eval: { first: new TextEncoder().encode('other') }, evalByCredential: { [credentialId]: { first: new TextEncoder().encode('salt-1'), second: new TextEncoder().encode('salt-2') } } }),
+      other: await evaluate({ eval: { first: new TextEncoder().encode('other') } }),
+    };
+  }, { rpId: server.HOSTNAME, credentialId: registration.id });
+
+  expect(authentication.byEval).toEqual({ first: registration.first, second: undefined, json: { prf: { results: { first: registration.first } } } });
+  expect(authentication.byCredential.first).toBe(registration.first);
+  expect(authentication.byCredential.second).toBe(registration.second);
+  expect(authentication.other.first).not.toBe(registration.first);
+
+  // Without the extension, no results are reported.
+  const withoutPrf = await page.evaluate(async ({ rpId }) => {
+    const cred = await navigator.credentials.get({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), rpId } }) as PublicKeyCredential;
+    return cred.getClientExtensionResults();
+  }, { rpId: server.HOSTNAME });
+  expect(withoutPrf).toEqual({});
+});

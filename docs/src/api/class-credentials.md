@@ -284,6 +284,9 @@ See [authentication guide](../auth.md) for examples of using saving and restorin
   filled with 16 random bytes.
 - The signature counter of a fresh credential starts at `0` and is incremented by one on every
   successful `navigator.credentials.get()` assertion. Pass [`option: Credentials.create.signCount`] to seed a different value.
+- The [`prf` extension](https://w3c.github.io/webauthn/#prf-extension) is supported for every credential. The PRF outputs
+  are derived from the credential's private key, so the same input always produces the same output for a given credential,
+  also after it is captured and re-seeded in another context.
 
 ## async method: Credentials.install
 * since: v1.61
